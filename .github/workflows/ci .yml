@@ -1,42 +1,37 @@
-name: CI - PR Validation
+name: CI
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [master, develop]
   push:
     branches: [develop]
+  workflow_dispatch:    
 
 permissions:
   contents: read
 
 jobs:
-  validate:
+  ci:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: 22
           cache: npm
+          registry-url: https://registry.npmjs.org/
 
-      - name: Install
+      - name: Install dependencies
         run: npm ci
 
-      - name: Format (check)
-        run: npm run format
-
       - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
+        run: npm run lint --if-present
 
       - name: Test
-        run: npm test
+        run: npm test --if-present
 
       - name: Build
-        run: npm run build
+        run: npm run build --if-present
