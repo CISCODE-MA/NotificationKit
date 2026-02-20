@@ -28,7 +28,15 @@ export default [
       import: importPlugin,
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "no-unused-vars": "off", // Disable base rule in favor of TypeScript version
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
       "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports" }],
 
       "import/no-duplicates": "error",
