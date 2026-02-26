@@ -1,4 +1,4 @@
-import { DynamicModule, Module, Provider, Type } from "@nestjs/common";
+import { Module, type DynamicModule, type Provider, type Type } from "@nestjs/common";
 
 import { NOTIFICATION_KIT_OPTIONS } from "./constants";
 import { NotificationController } from "./controllers/notification.controller";
