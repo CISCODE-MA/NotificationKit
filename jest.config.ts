@@ -3,7 +3,7 @@ import type { Config } from "jest";
 const config: Config = {
   testEnvironment: "node",
   clearMocks: true,
-  testMatch: ["<rootDir>/test/**/*.test.ts", "<rootDir>/src/**/*.spec.ts"],
+  testMatch: ["<rootDir>/test/**/*.spec.ts", "<rootDir>/src/**/*.spec.ts"],
   transform: {
     "^.+\\.ts$": ["ts-jest", { tsconfig: "tsconfig.json" }],
   },
