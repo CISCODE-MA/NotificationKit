@@ -10,4 +10,16 @@ export default defineConfig({
   target: "es2022",
   outDir: "dist",
   tsconfig: "tsconfig.build.json",
+  external: [
+    "@nestjs/common",
+    "nodemailer",
+    "twilio",
+    "@aws-sdk/client-sns",
+    "@vonage/server-sdk",
+    "firebase-admin",
+    "mongoose",
+    "handlebars",
+    "nanoid",
+    "zod",
+  ],
 });
