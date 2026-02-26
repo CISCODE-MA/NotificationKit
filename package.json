@@ -50,6 +50,32 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7"
   },
+  "peerDependenciesMeta": {
+    "nodemailer": {
+      "optional": true
+    },
+    "twilio": {
+      "optional": true
+    },
+    "@aws-sdk/client-sns": {
+      "optional": true
+    },
+    "@vonage/server-sdk": {
+      "optional": true
+    },
+    "firebase-admin": {
+      "optional": true
+    },
+    "mongoose": {
+      "optional": true
+    },
+    "handlebars": {
+      "optional": true
+    },
+    "nanoid": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "zod": "^3.24.1"
   },
