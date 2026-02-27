@@ -81,6 +81,9 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.7",
+    "@nestjs/common": "^11.1.14",
+    "@nestjs/core": "^11.1.14",
+    "@nestjs/testing": "^11.1.14",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.7",
     "eslint": "^9.18.0",
