@@ -118,7 +118,7 @@ export class MongooseNotificationRepository implements INotificationRepository {
 
     const docs = await query.exec();
 
-    return docs.map((doc) => this.documentToNotification(doc));
+    return docs.map((doc: NotificationDocument) => this.documentToNotification(doc));
   }
 
   async update(_id: string, _updates: Partial<Notification>): Promise<Notification> {
@@ -207,7 +207,7 @@ export class MongooseNotificationRepository implements INotificationRepository {
       .limit(_limit)
       .exec();
 
-    return docs.map((doc) => this.documentToNotification(doc));
+    return docs.map((doc: NotificationDocument) => this.documentToNotification(doc));
   }
 
   /**
@@ -251,10 +251,11 @@ export class MongooseNotificationRepository implements INotificationRepository {
   /**
    * Convert Mongoose Map to plain object
    */
-  private mapToRecord(map: Map<string, any> | any): Record<string, unknown> {
+  private mapToRecord(map: any): Record<string, unknown> {
     if (map instanceof Map) {
       return Object.fromEntries(map);
     }
-    return map;
+    // If it's already an object, return as-is
+    return map as Record<string, unknown>;
   }
 }
