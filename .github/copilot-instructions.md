@@ -1,109 +1,104 @@
-# Copilot Instructions - NestJS Developer Kit (Template)
+# Copilot Instructions - @ciscode/notification-kit
 
-> **Purpose**: Template for creating reusable NestJS module packages with best practices, standardized structure, and AI-friendly development workflow.
+> **Purpose**: Universal NestJS notification library supporting multi-channel delivery (Email, SMS, Push, In-App, Webhook) with pluggable provider backends, template support, persistence, and a built-in REST + Webhook API.
 
 ---
 
-## 🎯 Template Overview
+## 🎯 Package Overview
 
-**Package**: Template for `@ciscode/*` NestJS modules  
-**Type**: Backend NestJS Module Template  
-**Purpose**: Starting point for creating authentication, database, logging, and other NestJS modules
+**Package**: `@ciscode/notification-kit`  
+**Type**: Backend NestJS Notification Module  
+**Purpose**: Centralized, multi-channel notification delivery with pluggable providers, retry logic, status tracking, and scheduling — usable across all `@ciscode/*` services
 
-### This Template Provides:
+### This Package Provides:
 
-- CSR (Controller-Service-Repository) architecture
-- Complete TypeScript configuration with path aliases
-- Jest testing setup with 80% coverage threshold
+- CSR (Controller-Service-Repository) architecture with Clean Architecture ports
+- `NotificationKitModule` — global NestJS dynamic module (`register` / `registerAsync`)
+- `NotificationService` — injectable orchestration service (core, framework-free)
+- `NotificationController` — REST API for sending and querying notifications
+- `WebhookController` — inbound webhook receiver for provider delivery callbacks
+- Channel senders: **Email** (Nodemailer), **SMS** (Twilio / Vonage / AWS SNS), **Push** (Firebase), **In-App**, **Webhook**
+- Repository adapters: **MongoDB** (Mongoose) and **In-Memory**
+- Template rendering via Handlebars
+- Zod-validated configuration
 - Changesets for version management
 - Husky + lint-staged for code quality
-- CI/CD workflows
 - Copilot-friendly development guidelines
 
 ---
 
 ## 🏗️ Module Architecture
 
-**Modules use Controller-Service-Repository (CSR) pattern for simplicity and reusability.**
+**NotificationKit uses CSR (Controller-Service-Repository) + Ports & Adapters for maximum reusability and provider interchangeability.**
 
-> **WHY CSR for modules?** Reusable libraries need to be simple, well-documented, and easy to integrate. The 4-layer Clean Architecture is better suited for complex applications, not libraries.
+> **WHY CSR + Ports?** Reusable notification libraries must support multiple providers without coupling business logic to any specific SDK. Ports (interfaces) in `core/` define the contracts; adapters in `infra/` implement them. Apps choose which adapters to wire.
 
 ```
 src/
-  ├── index.ts                    # PUBLIC API exports
-  ├── {module-name}.module.ts     # NestJS module definition
+  ├── index.ts                                # PUBLIC API — all exports go through here
   │
-  ├── controllers/                # HTTP Layer
-  │   └── example.controller.ts
+  ├── core/                                   # ✅ Framework-FREE (no NestJS imports)
+  │   ├── index.ts
+  │   ├── types.ts                            # Domain entities & enums
+  │   ├── dtos/                               # Input/output contracts (Zod-validated)
+  │   ├── ports/                              # Abstractions (interfaces the infra implements)
+  │   │   ├── notification-sender.port.ts     # INotificationSender
+  │   │   ├── notification-repository.port.ts # INotificationRepository
+  │   │   └── (template, event, id, datetime ports)
+  │   ├── errors/                             # Domain errors
+  │   └── notification.service.ts            # Core orchestration logic (framework-free)
   │
-  ├── services/                   # Business Logic
-  │   └── example.service.ts
+  ├── infra/                                  # Concrete adapter implementations
+  │   ├── index.ts
+  │   ├── senders/                            # Channel sender adapters
+  │   │   ├── email/                          # Nodemailer adapter
+  │   │   ├── sms/                            # Twilio / Vonage / AWS SNS adapters
+  │   │   ├── push/                           # Firebase adapter
+  │   │   ├── in-app/                         # In-app adapter
+  │   │   └── webhook/                        # Outbound webhook adapter
+  │   ├── repositories/                       # Persistence adapters
+  │   │   ├── mongodb/                        # Mongoose adapter
+  │   │   └── in-memory/                      # In-memory adapter (testing / simple usage)
+  │   └── providers/                          # Utility adapters
+  │       ├── id-generator/                   # nanoid adapter
+  │       ├── datetime/                       # Date/time utilities
+  │       ├── template/                       # Handlebars adapter
+  │       └── events/                         # Event bus adapter
   │
-  ├── entities/                   # Domain Models
-  │   └── example.entity.ts
-  │
-  ├── repositories/               # Data Access
-  │   └── example.repository.ts
-  │
-  ├── guards/                     # Auth Guards
-  │   └── example.guard.ts
-  │
-  ├── decorators/                 # Custom Decorators
-  │   └── example.decorator.ts
-  │
-  ├── dto/                        # Data Transfer Objects
-  │   └── example.dto.ts
-  │
-  ├── filters/                    # Exception Filters
-  ├── middleware/                 # Middleware
-  ├── config/                     # Configuration
-  └── utils/                      # Utilities
+  └── nest/                                   # NestJS integration layer
+      ├── index.ts
+      ├── module.ts                           # NotificationKitModule
+      ├── interfaces.ts                       # NotificationKitModuleOptions, AsyncOptions, Factory
+      ├── constants.ts                        # NOTIFICATION_KIT_OPTIONS token
+      ├── providers.ts                        # createNotificationKitProviders() factory
+      └── controllers/
+          ├── notification.controller.ts      # REST API (enable via enableRestApi)
+          └── webhook.controller.ts           # Inbound webhooks (enable via enableWebhooks)
 ```
 
 **Responsibility Layers:**
 
-| Layer            | Responsibility                           | Examples                |
-| ---------------- | ---------------------------------------- | ----------------------- |
-| **Controllers**  | HTTP handling, route definition          | `example.controller.ts` |
-| **Services**     | Business logic, orchestration            | `example.service.ts`    |
-| **Entities**     | Domain models (Mongoose/TypeORM schemas) | `example.entity.ts`     |
-| **Repositories** | Data access, database queries            | `example.repository.ts` |
-| **Guards**       | Authentication/Authorization             | `jwt-auth.guard.ts`     |
-| **Decorators**   | Parameter extraction, metadata           | `@CurrentUser()`        |
-| **DTOs**         | Input validation, API contracts          | `create-example.dto.ts` |
+| Layer             | Responsibility                                             | Examples                                                    |
+| ----------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| **Controllers**   | HTTP handling, REST API, inbound webhook receivers         | `NotificationController`, `WebhookController`               |
+| **Core Service**  | Orchestration, channel routing, retry, status lifecycle    | `notification.service.ts`                                   |
+| **DTOs**          | Input validation, API contracts (Zod)                      | `SendNotificationDto`, `NotificationQueryDto`               |
+| **Ports**         | Abstractions — what `core/` depends on                     | `INotificationSender`, `INotificationRepository`            |
+| **Senders**       | Channel delivery — implement `INotificationSender`         | `EmailSender`, `SmsSender`, `PushSender`                    |
+| **Repositories**  | Persistence — implement `INotificationRepository`          | `MongoNotificationRepository`, `InMemoryRepository`         |
+| **Providers**     | Cross-cutting utilities                                    | `HandlebarsTemplateProvider`, `NanoidGenerator`             |
+| **Domain Types**  | Entities, enums, value objects (immutable, framework-free) | `Notification`, `NotificationChannel`, `NotificationStatus` |
+| **Domain Errors** | Typed, named error classes                                 | `ChannelNotConfiguredError`, `NotificationNotFoundError`    |
 
-**Module Exports (Public API):**
+### Layer Import Rules — STRICTLY ENFORCED
 
-```typescript
-// src/index.ts - Only export what apps need to consume
-export { ExampleModule } from "./example.module";
+| Layer   | Can import from        | Cannot import from |
+| ------- | ---------------------- | ------------------ |
+| `core`  | Nothing internal       | `infra`, `nest`    |
+| `infra` | `core` (ports & types) | `nest`             |
+| `nest`  | `core`, `infra`        | —                  |
 
-// Services (main API)
-export { ExampleService } from "./services/example.service";
-
-// DTOs (public contracts)
-export { CreateExampleDto, UpdateExampleDto } from "./dto";
-
-// Guards (for protecting routes)
-export { ExampleGuard } from "./guards/example.guard";
-
-// Decorators (for DI and metadata)
-export { ExampleDecorator } from "./decorators/example.decorator";
-
-// Types & Interfaces (for TypeScript typing)
-export type { ExampleOptions, ExampleResult } from "./types";
-
-// ❌ NEVER export entities or repositories
-// export { Example } from './entities/example.entity'; // FORBIDDEN
-// export { ExampleRepository } from './repositories/example.repository'; // FORBIDDEN
-```
-
-**Rationale:**
-
-- **Entities** = internal implementation details (can change)
-- **Repositories** = internal data access (apps shouldn't depend on it)
-- **DTOs** = stable public contracts (apps depend on these)
-- **Services** = public API (apps use methods, not internals)
+> **The golden rule**: `core/` must compile with zero NestJS or provider SDK imports. If you're adding a NestJS decorator or importing `nodemailer` inside `core/`, it's in the wrong layer.
 
 ---
 
@@ -113,58 +108,262 @@ export type { ExampleOptions, ExampleResult } from "./types";
 
 **Pattern**: `kebab-case` + suffix
 
-| Type       | Example                     | Directory       |
-| ---------- | --------------------------- | --------------- |
-| Controller | `example.controller.ts`     | `controllers/`  |
-| Service    | `example.service.ts`        | `services/`     |
-| Entity     | `example.entity.ts`         | `entities/`     |
-| Repository | `example.repository.ts`     | `repositories/` |
-| DTO        | `create-example.dto.ts`     | `dto/`          |
-| Guard      | `jwt-auth.guard.ts`         | `guards/`       |
-| Decorator  | `current-user.decorator.ts` | `decorators/`   |
-| Filter     | `http-exception.filter.ts`  | `filters/`      |
-| Middleware | `logger.middleware.ts`      | `middleware/`   |
-| Utility    | `validation.utils.ts`       | `utils/`        |
-| Config     | `jwt.config.ts`             | `config/`       |
+| Type             | Example                            | Directory                         |
+| ---------------- | ---------------------------------- | --------------------------------- |
+| Module           | `module.ts`                        | `src/nest/`                       |
+| Controller       | `notification.controller.ts`       | `src/nest/controllers/`           |
+| Core Service     | `notification.service.ts`          | `src/core/`                       |
+| Port interface   | `notification-sender.port.ts`      | `src/core/ports/`                 |
+| DTO              | `send-notification.dto.ts`         | `src/core/dtos/`                  |
+| Domain Error     | `notification-not-found.error.ts`  | `src/core/errors/`                |
+| Sender adapter   | `email.sender.ts`                  | `src/infra/senders/email/`        |
+| Repository       | `mongo-notification.repository.ts` | `src/infra/repositories/mongodb/` |
+| Utility provider | `handlebars-template.provider.ts`  | `src/infra/providers/template/`   |
+| Constants        | `constants.ts`                     | `src/nest/`                       |
 
 ### Code Naming
 
-- **Classes & Interfaces**: `PascalCase` → `ExampleController`, `CreateExampleDto`
-- **Variables & Functions**: `camelCase` → `getUserById`, `exampleList`
-- **Constants**: `UPPER_SNAKE_CASE` → `DEFAULT_TIMEOUT`, `MAX_RETRIES`
-- **Enums**: Name `PascalCase`, values `UPPER_SNAKE_CASE`
+- **Classes & Interfaces**: `PascalCase` → `NotificationService`, `INotificationSender`, `SendNotificationDto`
+- **Variables & functions**: `camelCase` → `sendNotification`, `buildProviders`
+- **Constants / DI tokens**: `UPPER_SNAKE_CASE` → `NOTIFICATION_KIT_OPTIONS`, `NOTIFICATION_SENDER`, `NOTIFICATION_REPOSITORY`
+- **Enums**: Name `PascalCase`, values match protocol strings
 
 ```typescript
-enum ExampleStatus {
-  ACTIVE = "ACTIVE",
-  INACTIVE = "INACTIVE",
+// ✅ Correct enum definitions
+enum NotificationChannel {
+  EMAIL = "email",
+  SMS = "sms",
+  PUSH = "push",
+  IN_APP = "in_app",
+  WEBHOOK = "webhook",
+}
+
+enum NotificationStatus {
+  PENDING = "pending",
+  QUEUED = "queued",
+  SENDING = "sending",
+  SENT = "sent",
+  DELIVERED = "delivered",
+  FAILED = "failed",
+  CANCELLED = "cancelled",
 }
 ```
 
-### Path Aliases
-
-Configured in `tsconfig.json`:
+### Path Aliases (`tsconfig.json`)
 
 ```typescript
-"@/*"              → "src/*"
-"@controllers/*"   → "src/controllers/*"
-"@services/*"      → "src/services/*"
-"@entities/*"      → "src/entities/*"
-"@repos/*"         → "src/repositories/*"
-"@dtos/*"          → "src/dto/*"
-"@guards/*"        → "src/guards/*"
-"@decorators/*"    → "src/decorators/*"
-"@config/*"        → "src/config/*"
-"@utils/*"         → "src/utils/*"
+"@/*"       → "src/*"
+"@core/*"   → "src/core/*"
+"@infra/*"  → "src/infra/*"
+"@nest/*"   → "src/nest/*"
 ```
 
 Use aliases for cleaner imports:
 
 ```typescript
-import { CreateExampleDto } from "@dtos/create-example.dto";
-import { ExampleService } from "@services/example.service";
-import { Example } from "@entities/example.entity";
+import { NotificationService } from "@core/notification.service";
+import { INotificationSender } from "@core/ports/notification-sender.port";
+import { SendNotificationDto } from "@core/dtos/send-notification.dto";
+import { EmailSender } from "@infra/senders/email/email.sender";
 ```
+
+---
+
+## 📦 Public API — `src/index.ts`
+
+```typescript
+// ✅ All exports go through here — never import from deep paths in consuming apps
+export * from "./core"; // Types, DTOs, ports, errors, NotificationService
+export * from "./infra"; // Senders, repositories, utility providers
+export * from "./nest"; // NotificationKitModule, interfaces, constants
+```
+
+**What consuming apps should use:**
+
+```typescript
+import {
+  NotificationKitModule,
+  NotificationService,
+  SendNotificationDto,
+  NotificationChannel,
+  NotificationStatus,
+  NotificationPriority,
+  type Notification,
+  type NotificationResult,
+  type INotificationSender, // for custom adapter implementations
+  type INotificationRepository, // for custom adapter implementations
+} from "@ciscode/notification-kit";
+```
+
+**❌ NEVER export:**
+
+- Internal provider wiring (`createNotificationKitProviders` internals)
+- Raw SDK instances (Nodemailer transporter, Twilio client, Firebase app)
+- Mongoose schema definitions (infrastructure details)
+
+---
+
+## ⚙️ Module Registration
+
+### `register()` — sync
+
+```typescript
+NotificationKitModule.register({
+  channels: {
+    email: {
+      provider: "nodemailer",
+      from: "no-reply@ciscode.com",
+      smtp: { host: "smtp.example.com", port: 587, auth: { user: "...", pass: "..." } },
+    },
+    sms: {
+      provider: "twilio",
+      accountSid: process.env.TWILIO_SID,
+      authToken: process.env.TWILIO_TOKEN,
+      from: process.env.TWILIO_FROM,
+    },
+    push: {
+      provider: "firebase",
+      serviceAccount: JSON.parse(process.env.FIREBASE_SA!),
+    },
+  },
+  repository: { type: "mongodb", uri: process.env.MONGO_URI },
+  templates: { engine: "handlebars", dir: "./templates" },
+  enableRestApi: true, // default: true
+  enableWebhooks: true, // default: true
+  retries: { max: 3, backoff: "exponential" },
+});
+```
+
+### `registerAsync()` — with ConfigService
+
+```typescript
+NotificationKitModule.registerAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) => ({
+    channels: {
+      email: { provider: "nodemailer", from: config.get("EMAIL_FROM") /* ... */ },
+      sms: { provider: config.get("SMS_PROVIDER") /* ... */ },
+    },
+    repository: { type: config.get("DB_TYPE"), uri: config.get("MONGO_URI") },
+    enableRestApi: config.get<boolean>("NOTIF_REST_API", true),
+    enableWebhooks: config.get<boolean>("NOTIF_WEBHOOKS", true),
+  }),
+});
+```
+
+### `registerAsync()` — with `useClass` / `useExisting`
+
+```typescript
+// useClass — module instantiates the factory
+NotificationKitModule.registerAsync({ useClass: NotificationKitConfigService });
+
+// useExisting — reuse an already-provided factory
+NotificationKitModule.registerAsync({ useExisting: NotificationKitConfigService });
+```
+
+> **Rule**: All channel credentials must come from env vars or `ConfigService` — never hardcoded in source. Validate all options with Zod at module startup.
+
+> **Controller limitation**: Controllers (`enableRestApi`, `enableWebhooks`) cannot be conditionally mounted in `registerAsync` mode and are excluded. Document this clearly when advising consumers.
+
+---
+
+## 🧩 Core Components
+
+### `NotificationService` (core — framework-free)
+
+The single orchestration point. Inject this in consuming apps. Never inject raw senders or repositories.
+
+```typescript
+// Inject in your NestJS service
+constructor(private readonly notifications: NotificationService) {}
+
+// Send a single notification
+const result = await this.notifications.send({
+  channel:   NotificationChannel.EMAIL,
+  recipient: { id: 'user-1', email: 'user@example.com' },
+  content:   { title: 'Welcome', body: 'Hello!', templateId: 'welcome' },
+  priority:  NotificationPriority.HIGH,
+});
+
+// Batch send
+const results = await this.notifications.sendBatch([...]);
+```
+
+**Public methods:**
+
+```typescript
+send(dto: SendNotificationDto):                          Promise<NotificationResult>
+sendBatch(dtos: SendNotificationDto[]):                  Promise<NotificationResult[]>
+getById(id: string):                                     Promise<Notification>
+getByRecipient(recipientId: string, filters?):           Promise<Notification[]>
+cancel(id: string):                                      Promise<void>
+retry(id: string):                                       Promise<NotificationResult>
+```
+
+### `INotificationSender` Port
+
+All channel senders implement this port. To add a new channel or provider, implement this interface in `infra/senders/<channel>/`:
+
+```typescript
+// core/ports/notification-sender.port.ts
+interface INotificationSender {
+  readonly channel: NotificationChannel;
+  send(notification: Notification): Promise<NotificationResult>;
+  isConfigured(): boolean;
+}
+```
+
+### `INotificationRepository` Port
+
+All persistence adapters implement this. Apps never depend on Mongoose schemas directly:
+
+```typescript
+// core/ports/notification-repository.port.ts
+interface INotificationRepository {
+  save(notification: Notification): Promise<Notification>;
+  findById(id: string): Promise<Notification | null>;
+  findByRecipient(recipientId: string, filters?): Promise<Notification[]>;
+  updateStatus(id: string, status: NotificationStatus, extra?): Promise<Notification>;
+  delete(id: string): Promise<void>;
+}
+```
+
+### `NotificationController` (REST API)
+
+Mounted when `enableRestApi: true`. Provides:
+
+| Method | Path                           | Description                    |
+| ------ | ------------------------------ | ------------------------------ |
+| `POST` | `/notifications`               | Send a notification            |
+| `POST` | `/notifications/batch`         | Send multiple notifications    |
+| `GET`  | `/notifications/:id`           | Get notification by ID         |
+| `GET`  | `/notifications/recipient/:id` | Get notifications by recipient |
+| `POST` | `/notifications/:id/cancel`    | Cancel a pending notification  |
+| `POST` | `/notifications/:id/retry`     | Retry a failed notification    |
+
+### `WebhookController`
+
+Mounted when `enableWebhooks: true`. Receives delivery status callbacks from providers (Twilio, Firebase, etc.) and updates notification status accordingly. Must verify provider-specific signatures.
+
+---
+
+## 🔌 Optional Provider Peer Dependencies
+
+All channel provider SDKs are **optional peer dependencies**. Only install what you use:
+
+| Channel | Provider    | Peer dep              | Install when...              |
+| ------- | ----------- | --------------------- | ---------------------------- |
+| Email   | Nodemailer  | `nodemailer`          | Using email channel          |
+| SMS     | Twilio      | `twilio`              | Using Twilio SMS             |
+| SMS     | Vonage      | `@vonage/server-sdk`  | Using Vonage SMS             |
+| SMS     | AWS SNS     | `@aws-sdk/client-sns` | Using AWS SNS SMS            |
+| Push    | Firebase    | `firebase-admin`      | Using push notifications     |
+| Any     | Persistence | `mongoose`            | Using MongoDB repository     |
+| Any     | Templates   | `handlebars`          | Using template rendering     |
+| Any     | ID gen      | `nanoid`              | Using the default ID adapter |
+
+> **Rule for adding a new provider**: implement `INotificationSender` in `infra/senders/<channel>/<provider>.sender.ts`, guard the import with a clear startup error if the peer dep is missing, and document the peer dep in JSDoc and README.
 
 ---
 
@@ -172,30 +371,58 @@ import { Example } from "@entities/example.entity";
 
 ### Coverage Target: 80%+
 
-**Unit Tests - MANDATORY:**
+**Unit Tests — MANDATORY:**
 
-- ✅ All services (business logic)
-- ✅ All utilities and helpers
-- ✅ Guards and decorators
-- ✅ Repository methods
+- ✅ `core/notification.service.ts` — channel routing, retry logic, status lifecycle, error handling
+- ✅ All DTOs — Zod schema validation, edge cases, invalid inputs
+- ✅ All domain errors — correct messages, inheritance
+- ✅ Each sender adapter — success path, failure path, `isConfigured()` guard
+- ✅ Each repository adapter — CRUD operations, query filters
+- ✅ Template provider — variable substitution, missing template errors
+- ✅ ID generator and datetime providers
 
 **Integration Tests:**
 
-- ✅ Controllers (full request/response)
-- ✅ Module initialization
-- ✅ Database operations (with test DB or mocks)
+- ✅ `NotificationKitModule.register()` — correct provider wiring per channel config
+- ✅ `NotificationKitModule.registerAsync()` — factory injection, full options resolved
+- ✅ `NotificationController` — full HTTP request/response lifecycle
+- ✅ `WebhookController` — provider callback → status update flow
+- ✅ MongoDB repository — real schema operations (with test DB or `mongodb-memory-server`)
 
 **E2E Tests:**
 
-- ✅ Complete flows (critical user paths)
+- ✅ Send notification → delivery → status update (per channel)
+- ✅ Retry flow (failure → retry → success)
+- ✅ Scheduled notification lifecycle
 
-**Test file location:**
+**Test file location:** same directory as source (`*.spec.ts`)
 
 ```
-src/
-  └── services/
-      ├── example.service.ts
-      └── example.service.spec.ts  ← Same directory
+src/core/
+  ├── notification.service.ts
+  └── notification.service.spec.ts
+
+src/infra/senders/email/
+  ├── email.sender.ts
+  └── email.sender.spec.ts
+```
+
+**Mocking senders and repositories in unit tests:**
+
+```typescript
+const mockSender: INotificationSender = {
+  channel: NotificationChannel.EMAIL,
+  send: jest.fn().mockResolvedValue({ success: true, notificationId: "n1" }),
+  isConfigured: jest.fn().mockReturnValue(true),
+};
+
+const mockRepository: INotificationRepository = {
+  save: jest.fn(),
+  findById: jest.fn(),
+  findByRecipient: jest.fn(),
+  updateStatus: jest.fn(),
+  delete: jest.fn(),
+};
 ```
 
 **Jest Configuration:**
@@ -203,9 +430,9 @@ src/
 ```javascript
 coverageThreshold: {
   global: {
-    branches: 80,
-    functions: 80,
-    lines: 80,
+    branches:   80,
+    functions:  80,
+    lines:      80,
     statements: 80,
   },
 }
@@ -219,32 +446,49 @@ coverageThreshold: {
 
 ````typescript
 /**
- * Creates a new example record
- * @param data - The example data to create
- * @returns The created example with generated ID
- * @throws {BadRequestException} If data is invalid
+ * Sends a notification through the specified channel.
+ * Routes to the appropriate sender adapter, persists the notification,
+ * and updates its status throughout the delivery lifecycle.
+ *
+ * @param dto - Validated send notification payload
+ * @returns Result containing success status and provider message ID
+ *
+ * @throws {ChannelNotConfiguredError} If the channel has no configured provider
+ * @throws {RecipientMissingFieldError} If the recipient is missing required fields for the channel
+ *
  * @example
  * ```typescript
- * const example = await service.create({ name: 'Test' });
+ * const result = await notificationService.send({
+ *   channel:   NotificationChannel.EMAIL,
+ *   recipient: { id: 'user-1', email: 'user@example.com' },
+ *   content:   { title: 'Welcome', body: 'Hello!' },
+ *   priority:  NotificationPriority.NORMAL,
+ * });
  * ```
  */
-async create(data: CreateExampleDto): Promise<Example>
+async send(dto: SendNotificationDto): Promise<NotificationResult>
 ````
 
 **Required for:**
 
-- All public functions/methods
-- All exported classes
-- All DTOs (with property descriptions)
+- All public methods on `NotificationService`
+- All port interfaces in `core/ports/`
+- All exported DTOs (with per-property descriptions)
+- All exported domain error classes
+- Both `register()` and `registerAsync()` on `NotificationKitModule`
+- All sender adapters' `send()` methods (document provider-specific behavior and peer dep)
 
-### Swagger/OpenAPI - Always on controllers:
+### Swagger/OpenAPI — ALWAYS on controllers:
 
 ```typescript
-@ApiOperation({ summary: 'Create new example' })
-@ApiResponse({ status: 201, description: 'Created successfully', type: ExampleDto })
-@ApiResponse({ status: 400, description: 'Invalid input' })
+@ApiTags('notifications')
+@ApiOperation({ summary: 'Send a notification' })
+@ApiBody({ type: SendNotificationDto })
+@ApiResponse({ status: 201, description: 'Notification queued successfully', type: NotificationResultDto })
+@ApiResponse({ status: 400, description: 'Invalid input or missing recipient field' })
+@ApiResponse({ status: 422, description: 'Channel not configured' })
 @Post()
-async create(@Body() dto: CreateExampleDto) { }
+async send(@Body() dto: SendNotificationDto): Promise<NotificationResult> {}
 ```
 
 ---
@@ -253,50 +497,51 @@ async create(@Body() dto: CreateExampleDto) { }
 
 ### 1. Exportability
 
-**Export ONLY public API (Services + DTOs + Guards + Decorators):**
+**Export ONLY public API:**
 
 ```typescript
-// src/index.ts - Public API
-export { ExampleModule } from "./example.module";
-export { ExampleService } from "./services/example.service";
-export { CreateExampleDto, UpdateExampleDto } from "./dto";
-export { ExampleGuard } from "./guards/example.guard";
-export { ExampleDecorator } from "./decorators/example.decorator";
-export type { ExampleOptions } from "./types";
+// src/index.ts
+export * from "./core"; // Types, DTOs, ports, errors, NotificationService
+export * from "./infra"; // Senders, repositories, providers
+export * from "./nest"; // NotificationKitModule, interfaces
 ```
 
 **❌ NEVER export:**
 
-- Entities (internal domain models)
-- Repositories (infrastructure details)
+- Raw SDK clients (Nodemailer transporter, Twilio client instances)
+- Internal `createNotificationKitProviders()` wiring details
+- Mongoose schema definitions
 
 ### 2. Configuration
 
-**Flexible module registration:**
+**All three async patterns supported:**
 
 ```typescript
 @Module({})
-export class ExampleModule {
-  static forRoot(options: ExampleModuleOptions): DynamicModule {
-    return {
-      module: ExampleModule,
-      providers: [{ provide: "EXAMPLE_OPTIONS", useValue: options }, ExampleService],
-      exports: [ExampleService],
-    };
+export class NotificationKitModule {
+  static register(options: NotificationKitModuleOptions): DynamicModule {
+    /* ... */
   }
-
-  static forRootAsync(options: ExampleModuleAsyncOptions): DynamicModule {
-    // Async configuration
+  static registerAsync(options: NotificationKitModuleAsyncOptions): DynamicModule {
+    // supports useFactory, useClass, useExisting
   }
 }
 ```
 
+**Controllers are opt-out, not opt-in:**
+
+```typescript
+// Both default to true — apps must explicitly disable
+NotificationKitModule.register({ enableRestApi: false, enableWebhooks: false });
+```
+
 ### 3. Zero Business Logic Coupling
 
-- No hardcoded business rules
-- Configurable behavior via options
-- Database-agnostic (if applicable)
-- Apps provide their own connections
+- No hardcoded recipients, templates, credentials, or channel preferences
+- All provider credentials from options (never from `process.env` directly inside the module)
+- Channel senders are stateless — no shared mutable state between requests
+- Repository is swappable — core service depends only on `INotificationRepository`
+- Apps bring their own Mongoose connection — this module never creates its own DB connection
 
 ---
 
@@ -307,34 +552,30 @@ export class ExampleModule {
 **1. Branch Creation:**
 
 ```bash
-feature/MODULE-123-add-feature
-bugfix/MODULE-456-fix-issue
-refactor/MODULE-789-improve-code
+feature/NOTIF-123-add-vonage-sms-sender
+bugfix/NOTIF-456-fix-firebase-retry-on-token-expiry
+refactor/NOTIF-789-extract-retry-logic-to-core
 ```
 
 **2. Task Documentation:**
 Create task file at branch start:
 
 ```
-docs/tasks/active/MODULE-123-add-feature.md
+docs/tasks/active/NOTIF-123-add-vonage-sms-sender.md
 ```
 
 **3. On Release:**
 Move to archive:
 
 ```
-docs/tasks/archive/by-release/v2.0.0/MODULE-123-add-feature.md
+docs/tasks/archive/by-release/v1.0.0/NOTIF-123-add-vonage-sms-sender.md
 ```
 
 ### Development Workflow
 
-**Simple changes**:
+**Simple changes**: Read context → Implement → Update docs → **Create changeset**
 
-- Read context → Implement → Update docs → **Create changeset**
-
-**Complex changes**:
-
-- Read context → Discuss approach → Implement → Update docs → **Create changeset**
+**Complex changes**: Read context → Discuss approach → Implement → Update docs → **Create changeset**
 
 **When blocked**:
 
@@ -347,23 +588,28 @@ docs/tasks/archive/by-release/v2.0.0/MODULE-123-add-feature.md
 
 ### Semantic Versioning (Strict)
 
-**MAJOR** (x.0.0) - Breaking changes:
+**MAJOR** (x.0.0) — Breaking changes:
 
-- Changed function signatures
-- Removed public methods
-- Changed DTOs structure
-- Changed module configuration
+- Changed `NotificationService` public method signatures
+- Removed or renamed fields in `SendNotificationDto` or `Notification`
+- Changed `NotificationKitModuleOptions` required fields
+- Renamed `register()` / `registerAsync()` or changed their call signatures
+- Changed `INotificationSender` or `INotificationRepository` port contracts
+- Removed a supported channel or provider
 
-**MINOR** (0.x.0) - New features:
+**MINOR** (0.x.0) — New features:
 
-- New endpoints/methods
-- New optional parameters
-- New decorators/guards
+- New channel support (e.g. WhatsApp sender)
+- New optional fields in `NotificationKitModuleOptions`
+- New provider for an existing channel (e.g. Vonage alongside Twilio)
+- New `NotificationService` methods (additive)
+- New exported utilities or decorators
 
-**PATCH** (0.0.x) - Bug fixes:
+**PATCH** (0.0.x) — Bug fixes:
 
-- Internal fixes
-- Performance improvements
+- Provider-specific delivery fix
+- Retry backoff correction
+- Template rendering edge case
 - Documentation updates
 
 ### Changesets Workflow
@@ -376,10 +622,7 @@ npx changeset
 
 **When to create a changeset:**
 
-- ✅ New features
-- ✅ Bug fixes
-- ✅ Breaking changes
-- ✅ Performance improvements
+- ✅ New features, bug fixes, breaking changes, performance improvements
 - ❌ Internal refactoring (no user impact)
 - ❌ Documentation updates only
 - ❌ Test improvements only
@@ -396,10 +639,10 @@ npx changeset
 
 ```markdown
 ---
-"@ciscode/example-kit": minor
+"@ciscode/notification-kit": minor
 ---
 
-Added support for custom validators in ExampleService
+Added Vonage SMS sender adapter as an alternative to Twilio
 ```
 
 ### CHANGELOG Required
@@ -407,23 +650,22 @@ Added support for custom validators in ExampleService
 Changesets automatically generates CHANGELOG. For manual additions:
 
 ```markdown
-# Changelog
-
-## [2.0.0] - 2026-02-03
+## [1.0.0] - 2026-02-26
 
 ### BREAKING CHANGES
 
-- `create()` now requires `userId` parameter
-- Removed deprecated `validateExample()` method
+- `NotificationService.send()` now requires `priority` field in `SendNotificationDto`
+- Removed `createDefaultNotificationService()` — use `NotificationKitModule.register()` instead
 
 ### Added
 
-- New `ExampleGuard` for route protection
-- Support for async configuration
+- Vonage SMS sender adapter
+- `sendBatch()` method on `NotificationService`
+- In-memory repository for testing and lightweight usage
 
 ### Fixed
 
-- Fixed validation edge case
+- Firebase push sender now correctly retries on token expiry (401)
 ```
 
 ---
@@ -432,45 +674,44 @@ Changesets automatically generates CHANGELOG. For manual additions:
 
 **ALWAYS:**
 
-- ✅ Input validation on all DTOs (class-validator)
-- ✅ JWT secret from env (never hardcoded)
-- ✅ Rate limiting on public endpoints
-- ✅ No secrets in code
-- ✅ Sanitize error messages (no stack traces in production)
-
-**Example:**
+- ✅ Validate all DTOs with Zod at module boundary
+- ✅ All provider credentials from env vars — never hardcoded
+- ✅ Sanitize notification content before logging — never log full `templateVars` (may contain PII)
+- ✅ Webhook endpoints must verify provider signatures (e.g. `X-Twilio-Signature`)
+- ✅ Rate-limit the REST API endpoints in production (document this requirement for consumers)
+- ✅ Recipient `metadata` must never appear in error messages or stack traces
 
 ```typescript
-export class CreateExampleDto {
-  @IsString()
-  @MinLength(3)
-  @MaxLength(50)
-  name: string;
+// ❌ WRONG — logs PII from templateVars
+this.logger.error("Template render failed", { notification });
 
-  @IsEmail()
-  email: string;
-}
+// ✅ CORRECT — log only safe identifiers
+this.logger.error("Template render failed", {
+  notificationId: notification.id,
+  channel: notification.channel,
+});
 ```
 
 ---
 
-## 🚫 Restrictions - Require Approval
+## 🚫 Restrictions — Require Approval
 
 **NEVER without approval:**
 
-- Breaking changes to public API
-- Changing exported DTOs/interfaces
-- Removing exported functions
-- Major dependency upgrades
-- Security-related changes
+- Breaking changes to `NotificationService` public methods
+- Removing or renaming fields in `SendNotificationDto`, `Notification`, or `NotificationResult`
+- Changing `INotificationSender` or `INotificationRepository` port contracts
+- Removing a supported channel or provider adapter
+- Renaming `register()` / `registerAsync()` or their option shapes
+- Security-related changes (webhook signature verification, credential handling)
 
 **CAN do autonomously:**
 
-- Bug fixes (no breaking changes)
-- Internal refactoring
-- Adding new features (non-breaking)
-- Test improvements
-- Documentation updates
+- Bug fixes (non-breaking)
+- New optional `NotificationKitModuleOptions` fields
+- New sender adapter for an existing channel (e.g. AWS SES alongside Nodemailer)
+- Internal refactoring within a single layer (no public API or port contract change)
+- Test and documentation improvements
 
 ---
 
@@ -481,39 +722,42 @@ Before publishing:
 - [ ] All tests passing (100% of test suite)
 - [ ] Coverage >= 80%
 - [ ] No ESLint warnings (`--max-warnings=0`)
-- [ ] TypeScript strict mode passing
+- [ ] TypeScript strict mode passing (`tsc --noEmit`)
+- [ ] `npm run build` succeeds — both `.mjs` and `.cjs` outputs in `dist/`
 - [ ] All public APIs documented (JSDoc)
-- [ ] README updated with examples
+- [ ] All new `NotificationKitModuleOptions` fields documented in README
+- [ ] Optional peer deps documented (which to install for which channel)
 - [ ] Changeset created
-- [ ] Breaking changes highlighted
-- [ ] Integration tested with sample app
+- [ ] Breaking changes highlighted in changeset
+- [ ] Integration tested via `npm link` in a real consuming NestJS app
 
 ---
 
 ## 🔄 Development Workflow
 
-### Working on Module:
+### Working on the Module:
 
-1. Clone module repo
-2. Create branch: `feature/TASK-123-description` from `develop`
+1. Clone the repo
+2. Create branch: `feature/NOTIF-123-description` from `develop`
 3. Implement with tests
 4. **Create changeset**: `npx changeset`
 5. Verify checklist
 6. Create PR → `develop`
 
-### Testing in App:
+### Testing in a Consuming App:
 
 ```bash
-# In module
+# In notification-kit
+npm run build
 npm link
 
-# In app
-cd ~/comptaleyes/backend
-npm link @ciscode/example-kit
+# In your NestJS app
+cd ~/ciscode/backend
+npm link @ciscode/notification-kit
 
 # Develop and test
 # Unlink when done
-npm unlink @ciscode/example-kit
+npm unlink @ciscode/notification-kit
 ```
 
 ---
@@ -523,18 +767,35 @@ npm unlink @ciscode/example-kit
 - ESLint `--max-warnings=0`
 - Prettier formatting
 - TypeScript strict mode
-- FP for logic, OOP for structure
-- Dependency injection via constructor
-
-**Example:**
+- Pure functions in `core/` (no side effects, no SDK calls)
+- OOP classes for NestJS providers and sender/repository adapters
+- Dependency injection via constructor — never property-based `@Inject()`
+- Sender adapters are stateless — no mutable instance variables after construction
 
 ```typescript
+// ✅ Correct — constructor injection, stateless sender
 @Injectable()
-export class ExampleService {
+export class EmailSender implements INotificationSender {
+  readonly channel = NotificationChannel.EMAIL;
+
   constructor(
-    private readonly repo: ExampleRepository,
-    private readonly logger: LoggerService,
+    @Inject(NOTIFICATION_KIT_OPTIONS)
+    private readonly options: NotificationKitModuleOptions,
   ) {}
+
+  async send(notification: Notification): Promise<NotificationResult> {
+    /* ... */
+  }
+  isConfigured(): boolean {
+    return !!this.options.channels?.email;
+  }
+}
+
+// ❌ Wrong — property injection, mutable state
+@Injectable()
+export class EmailSender {
+  @Inject(NOTIFICATION_KIT_OPTIONS) private options: NotificationKitModuleOptions;
+  private transporter: any; // mutated after construction ← FORBIDDEN
 }
 ```
 
@@ -542,24 +803,34 @@ export class ExampleService {
 
 ## 🐛 Error Handling
 
-**Custom domain errors:**
+**Custom domain errors — ALWAYS in `core/errors/`:**
 
 ```typescript
-export class ExampleNotFoundError extends Error {
+export class ChannelNotConfiguredError extends Error {
+  constructor(channel: NotificationChannel) {
+    super(
+      `Channel "${channel}" is not configured. Did you pass options for it in NotificationKitModule.register()?`,
+    );
+    this.name = "ChannelNotConfiguredError";
+  }
+}
+
+export class NotificationNotFoundError extends Error {
   constructor(id: string) {
-    super(`Example ${id} not found`);
-    this.name = "ExampleNotFoundError";
+    super(`Notification "${id}" not found`);
+    this.name = "NotificationNotFoundError";
   }
 }
 ```
 
-**Structured logging:**
+**Structured logging — safe identifiers only:**
 
 ```typescript
-this.logger.error("Operation failed", {
-  exampleId: id,
-  reason: "validation_error",
-  timestamp: new Date().toISOString(),
+this.logger.error("Notification delivery failed", {
+  notificationId: notification.id,
+  channel: notification.channel,
+  provider: "twilio",
+  attempt: notification.retryCount,
 });
 ```
 
@@ -568,16 +839,18 @@ this.logger.error("Operation failed", {
 ```typescript
 // ❌ WRONG
 try {
-  await operation();
-} catch (error) {
-  // Silent failure
+  await sender.send(notification);
+} catch {
+  // silent
 }
 
 // ✅ CORRECT
 try {
-  await operation();
+  await sender.send(notification);
 } catch (error) {
-  this.logger.error("Operation failed", { error });
+  await this.repository.updateStatus(notification.id, NotificationStatus.FAILED, {
+    error: (error as Error).message,
+  });
   throw error;
 }
 ```
@@ -587,9 +860,10 @@ try {
 ## 💬 Communication Style
 
 - Brief and direct
-- Focus on results
-- Module-specific context
-- Highlight breaking changes immediately
+- Reference the correct layer (`core`, `infra`, `nest`) when discussing changes
+- Always name the channel and provider when discussing sender-related changes
+- Flag breaking changes immediately — even suspected ones
+- This module is consumed by multiple services — when in doubt about impact, ask
 
 ---
 
@@ -602,12 +876,28 @@ try {
 3. Complete documentation
 4. Strict versioning
 5. Breaking changes = MAJOR bump + changeset
-6. Zero app coupling
-7. Configurable behavior
+6. Zero app coupling — no hardcoded credentials, recipients, or templates
+7. Configurable behavior via `NotificationKitModuleOptions`
 
-**When in doubt:** Ask, don't assume. Modules impact multiple projects.
+**Layer ownership — quick reference:**
+
+| Concern                      | Owner                              |
+| ---------------------------- | ---------------------------------- |
+| Domain types & enums         | `src/core/types.ts`                |
+| DTOs & Zod validation        | `src/core/dtos/`                   |
+| Port interfaces              | `src/core/ports/`                  |
+| Orchestration logic          | `src/core/notification.service.ts` |
+| Domain errors                | `src/core/errors/`                 |
+| Channel sender adapters      | `src/infra/senders/<channel>/`     |
+| Persistence adapters         | `src/infra/repositories/`          |
+| Utility adapters             | `src/infra/providers/`             |
+| NestJS DI, module, providers | `src/nest/`                        |
+| REST API & webhook endpoints | `src/nest/controllers/`            |
+| All public exports           | `src/index.ts`                     |
+
+**When in doubt:** Ask, don't assume. This module delivers notifications across production services.
 
 ---
 
-_Last Updated: February 3, 2026_  
-_Version: 2.0.0_
+_Last Updated: February 26, 2026_  
+_Version: 1.0.0_
