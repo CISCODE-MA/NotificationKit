@@ -2,7 +2,7 @@ name: CI - Release Check
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, main]
   workflow_dispatch:
     inputs:
       sonar:
@@ -28,7 +28,7 @@ jobs:
     env:
       SONAR_HOST_URL: "https://sonarcloud.io"
       SONAR_ORGANIZATION: "ciscode"
-      SONAR_PROJECT_KEY: "CISCODE-MA_LoggingKit"
+      SONAR_PROJECT_KEY: "CISCODE-MA_NotificationKit"
 
     steps:
       - name: Checkout
@@ -62,7 +62,7 @@ jobs:
 
       - name: SonarCloud Scan
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.sonar == 'true' }}
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
@@ -76,7 +76,7 @@ jobs:
 
       - name: SonarCloud Quality Gate
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.sonar == 'true' }}
-        uses: SonarSource/sonarqube-quality-gate-action@v1
+        uses: SonarSource/sonarqube-quality-gate-action@d304d050d930b02a896b0f85935344f023928496 # v1
         timeout-minutes: 10
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
