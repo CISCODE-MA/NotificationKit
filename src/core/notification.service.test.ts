@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 
-import type {
-  MockRepository,
-  MockSender} from "../../test/test-utils";
+import type { MockRepository, MockSender } from "../../test/test-utils";
 import {
   createFailingNotificationServiceWithDeps,
   createNotificationServiceWithDeps,
