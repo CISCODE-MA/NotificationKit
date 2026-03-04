@@ -347,3 +347,195 @@ it("test", async () => {
 - [ ] Mocks cleaned up in afterEach
 - [ ] Async operations properly awaited
 - [ ] Error cases tested
+
+---
+
+## 🧰 Shared Test Utilities
+
+This package provides shared test utilities in `test/test-utils.ts` to reduce code duplication and make testing easier.
+
+### Mock Implementations
+
+```typescript
+import {
+  MockRepository,
+  MockSender,
+  MockTemplateEngine,
+  MockEventEmitter,
+  MockFailingSender,
+} from "../test/test-utils";
+
+// In-memory notification repository
+const repository = new MockRepository();
+await repository.create(notification);
+
+// Mock notification sender (always succeeds)
+const sender = new MockSender(NotificationChannel.EMAIL);
+await sender.send(recipient, content);
+
+// Mock sender that simulates failures
+const failingSender = new MockFailingSender();
+failingSender.setShouldFail(true);
+
+// Mock template engine
+const templateEngine = new MockTemplateEngine();
+await templateEngine.render("welcome", { name: "John" });
+
+// Mock event emitter
+const eventEmitter = new MockEventEmitter();
+eventEmitter.on("notification.sent", handler);
+```
+
+### Factory Functions
+
+```typescript
+import {
+  createNotificationServiceWithDeps,
+  createFailingNotificationServiceWithDeps,
+  createModuleTestOptions,
+} from "../test/test-utils";
+
+// Create service with all mocked dependencies
+const { service, repository, sender, idGenerator, dateTimeProvider } =
+  createNotificationServiceWithDeps();
+
+// Create service with failing sender for error testing
+const { service: failingService, repository: failingRepo } =
+  createFailingNotificationServiceWithDeps();
+
+// Create module configuration for NestJS testing
+const options = createModuleTestOptions({
+  senders: [new MockSender()],
+  repository: new MockRepository(),
+});
+```
+
+### Default Test Data
+
+```typescript
+import { defaultNotificationDto, createMockNotification } from "../test/test-utils";
+
+// Standard notification DTO for tests
+const notification = await service.send(defaultNotificationDto);
+
+// Create mock notification with custom overrides
+const mockNotification = createMockNotification({
+  status: NotificationStatus.SENT,
+  priority: NotificationPriority.HIGH,
+});
+```
+
+### Usage Example
+
+```typescript
+import { createNotificationServiceWithDeps, defaultNotificationDto } from "../test/test-utils";
+
+describe("MyFeature", () => {
+  let service: NotificationService;
+  let repository: MockRepository;
+
+  beforeEach(() => {
+    const ctx = createNotificationServiceWithDeps();
+    service = ctx.service;
+    repository = ctx.repository;
+  });
+
+  it("should create notification", async () => {
+    const notification = await service.create(defaultNotificationDto);
+
+    expect(notification.id).toBeDefined();
+    expect(notification.status).toBe(NotificationStatus.QUEUED);
+  });
+
+  it("should send notification", async () => {
+    const result = await service.send(defaultNotificationDto);
+
+    expect(result.success).toBe(true);
+
+    // Repository is shared, can verify persistence
+    const notifications = await repository.find({});
+    expect(notifications).toHaveLength(1);
+  });
+});
+```
+
+### Benefits
+
+- ✅ **Reduced duplication**: Centralized mock implementations
+- ✅ **Consistent behavior**: All tests use the same mocks
+- ✅ **Easy setup**: Factory functions handle complex initialization
+- ✅ **Type safety**: Full TypeScript support
+- ✅ **Maintainable**: Changes to mocks update all tests automatically
+
+---
+
+## 📈 Current Test Coverage
+
+The package maintains comprehensive test coverage:
+
+- **Total Tests**: 133+
+- **Test Suites**: 10
+- **Code Duplication**: 2.66% (well below 3% threshold)
+- **Coverage Target**: 80%+ (achieved)
+
+### Test Distribution
+
+- ✅ Core domain tests (notification.service.test.ts)
+- ✅ DTO validation tests (dtos.test.ts)
+- ✅ Error handling tests (errors.test.ts)
+- ✅ Provider tests (providers.test.ts)
+- ✅ Controller tests (notification.controller.test.ts, webhook.controller.test.ts)
+- ✅ Module tests (module.test.ts)
+- ✅ Decorator tests (decorators.test.ts)
+- ✅ Integration tests (integration.test.ts)
+- ✅ Smoke tests (smoke.test.ts)
+
+---
+
+## 🚀 Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:cov
+
+# Watch mode for development
+npm run test:watch
+
+# Run specific test file
+npm test -- notification.service.test.ts
+
+# Run tests matching pattern
+npm test -- --testNamePattern="should send notification"
+```
+
+---
+
+## 📝 Writing New Tests
+
+When adding new tests:
+
+1. **Use shared utilities** from `test/test-utils.ts` to avoid duplication
+2. **Follow naming conventions**: `[feature].test.ts` or `[feature].spec.ts`
+3. **Test behavior**, not implementation details
+4. **Include error cases** and edge conditions
+5. **Keep tests independent** - no shared state between tests
+6. **Use descriptive names**: `it('should [expected behavior] when [condition]')`
+7. **Clean up mocks** in `afterEach()` hooks
+
+---
+
+## 🔍 Quality Checks
+
+Before committing:
+
+```bash
+npm run lint              # Check code style
+npm run typecheck         # Check TypeScript types
+npm test                  # Run all tests
+npm run test:cov          # Verify coverage
+```
+
+All checks must pass before merging to main branch.

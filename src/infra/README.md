@@ -135,37 +135,62 @@ const pushSender = new AwsSnsPushSender({
 
 ## 💾 Repositories
 
-### MongoDB with Mongoose
+> **Note**: Repository implementations are provided by separate database packages.
+> Install the appropriate package for your database:
+
+### MongoDB
+
+Install the MongoDB package:
+
+```bash
+npm install @ciscode/notification-kit-mongodb
+```
 
 ```typescript
+import { MongooseNotificationRepository } from "@ciscode/notification-kit-mongodb";
 import mongoose from "mongoose";
-import { MongooseNotificationRepository } from "@ciscode/notification-kit/infra";
 
 const connection = await mongoose.createConnection("mongodb://localhost:27017/mydb");
-
-const repository = new MongooseNotificationRepository(
-  connection,
-  "notifications", // collection name (optional)
-);
+const repository = new MongooseNotificationRepository(connection);
 ```
 
-**Peer Dependency**: `mongoose`
+### PostgreSQL
 
-### In-Memory (Testing)
+Install the PostgreSQL package:
+
+```bash
+npm install @ciscode/notification-kit-postgres
+```
+
+### Custom Repository
+
+Implement the `INotificationRepository` interface:
 
 ```typescript
-import { InMemoryNotificationRepository } from "@ciscode/notification-kit/infra";
+import type { INotificationRepository, Notification } from "@ciscode/notification-kit";
 
-const repository = new InMemoryNotificationRepository();
+class MyCustomRepository implements INotificationRepository {
+  async create(data: Omit<Notification, "id" | "createdAt" | "updatedAt">): Promise<Notification> {
+    // Your implementation
+  }
 
-// For testing - clear all data
-repository.clear();
+  async findById(id: string): Promise<Notification | null> {
+    // Your implementation
+  }
 
-// For testing - get all notifications
-const all = repository.getAll();
+  // ... implement other methods
+}
 ```
 
-**No dependencies**
+### Schema Reference
+
+The MongoDB schema is exported as a reference:
+
+```typescript
+import { notificationSchemaDefinition } from "@ciscode/notification-kit/infra";
+
+// Use this as a reference for your own schema implementations
+```
 
 ## 🛠️ Utility Providers
 

@@ -1,6 +1,14 @@
-// MongoDB/Mongoose repository
-export * from "./mongoose/notification.schema";
-export * from "./mongoose/mongoose.repository";
+/**
+ * Repository schemas and types
+ *
+ * NOTE: Concrete repository implementations are provided by separate packages.
+ * Install the appropriate database package:
+ * - @ciscode/notification-kit-mongodb
+ * - @ciscode/notification-kit-postgres
+ * - etc.
+ *
+ * These schemas serve as reference for implementing your own repository.
+ */
 
-// In-memory repository
-export * from "./in-memory/in-memory.repository";
+// MongoDB/Mongoose schema (reference)
+export * from "./mongoose/notification.schema";

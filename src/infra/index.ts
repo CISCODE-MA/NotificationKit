@@ -4,11 +4,11 @@
  * This layer contains concrete implementations of the core interfaces.
  * It includes:
  * - Notification senders (email, SMS, push)
- * - Repositories (MongoDB, in-memory)
+ * - Repository schemas (reference implementations)
  * - Utility providers (ID generator, datetime, templates, events)
  *
- * These implementations are internal and not exported by default.
- * They can be used when configuring the NestJS module.
+ * NOTE: Repository implementations are provided by separate database packages.
+ * Install the appropriate package: @ciscode/notification-kit-mongodb, etc.
  */
 
 // Senders
