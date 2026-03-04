@@ -5,7 +5,11 @@ const config: Config = {
   clearMocks: true,
   resetMocks: true,
   restoreMocks: true,
-  testMatch: ["<rootDir>/test/**/*.test.ts", "<rootDir>/src/**/*.test.ts"],
+  testMatch: [
+    "<rootDir>/test/**/*.test.ts",
+    "<rootDir>/test/**/*.spec.ts",
+    "<rootDir>/src/**/*.test.ts",
+  ],
   transform: {
     "^.+\\.ts$": ["ts-jest", { tsconfig: "tsconfig.json" }],
   },
