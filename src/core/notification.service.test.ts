@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 
+import type {
+  MockRepository,
+  MockSender} from "../../test/test-utils";
+import {
+  createFailingNotificationServiceWithDeps,
+  createNotificationServiceWithDeps,
+  defaultNotificationDto,
+  MockTemplateEngine,
+} from "../../test/test-utils";
+
 import {
   MaxRetriesExceededError,
   NotificationNotFoundError,
@@ -7,190 +17,21 @@ import {
   TemplateError,
 } from "./errors";
 import { NotificationService } from "./notification.service";
-import type {
-  IDateTimeProvider,
-  IIdGenerator,
-  INotificationEventEmitter,
-  INotificationRepository,
-  INotificationSender,
-  ITemplateEngine,
-} from "./ports";
+import type { INotificationEventEmitter, ITemplateEngine } from "./ports";
 import { NotificationChannel, NotificationPriority, NotificationStatus } from "./types";
-import type { Notification } from "./types";
-
-// Mock implementations
-class MockIdGenerator implements IIdGenerator {
-  private counter = 0;
-
-  generate(): string {
-    return `notif-${++this.counter}`;
-  }
-}
-
-class MockDateTimeProvider implements IDateTimeProvider {
-  private currentDate = new Date("2024-01-01T00:00:00Z");
-
-  now(): string {
-    return this.currentDate.toISOString();
-  }
-
-  isPast(date: string): boolean {
-    return new Date(date) < this.currentDate;
-  }
-
-  isFuture(date: string): boolean {
-    return new Date(date) > this.currentDate;
-  }
-
-  setCurrentDate(date: Date) {
-    this.currentDate = date;
-  }
-}
-
-class MockRepository implements INotificationRepository {
-  private notifications = new Map<string, Notification>();
-
-  async create(
-    notification: Omit<Notification, "id" | "createdAt" | "updatedAt">,
-  ): Promise<Notification> {
-    const now = new Date().toISOString();
-    const created = {
-      ...notification,
-      id: `notif-${this.notifications.size + 1}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.notifications.set(created.id, created);
-    return created;
-  }
-
-  async update(id: string, updates: Partial<Notification>): Promise<Notification> {
-    const notification = this.notifications.get(id);
-    if (!notification) {
-      throw new NotificationNotFoundError(id);
-    }
-    const updated = { ...notification, ...updates, updatedAt: new Date().toISOString() };
-    this.notifications.set(id, updated);
-    return updated;
-  }
-
-  async findById(id: string): Promise<Notification | null> {
-    return this.notifications.get(id) || null;
-  }
-
-  async find(_criteria: any): Promise<Notification[]> {
-    return Array.from(this.notifications.values());
-  }
-
-  async count(_criteria: any): Promise<number> {
-    return this.notifications.size;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    return this.notifications.delete(id);
-  }
-
-  async findReadyToSend(): Promise<Notification[]> {
-    const now = new Date().toISOString();
-    return Array.from(this.notifications.values()).filter(
-      (n) => n.status === NotificationStatus.PENDING && n.scheduledFor && n.scheduledFor <= now,
-    );
-  }
-}
-
-class MockSender implements INotificationSender {
-  readonly channel = NotificationChannel.EMAIL;
-
-  async send(
-    _recipient: any,
-    _content: any,
-  ): Promise<{ success: boolean; notificationId: string; providerMessageId?: string }> {
-    return { success: true, notificationId: "notif-1", providerMessageId: "msg-123" };
-  }
-
-  async isReady(): Promise<boolean> {
-    return true;
-  }
-
-  validateRecipient(_recipient: any): boolean {
-    return true;
-  }
-}
-
-class MockFailingSender implements INotificationSender {
-  readonly channel = NotificationChannel.EMAIL;
-
-  async send(
-    _recipient: any,
-    _content: any,
-  ): Promise<{ success: boolean; notificationId: string; providerMessageId?: string }> {
-    throw new Error("Send failed");
-  }
-
-  async isReady(): Promise<boolean> {
-    return true;
-  }
-
-  validateRecipient(_recipient: any): boolean {
-    return true;
-  }
-}
-
-class MockTemplateEngine implements ITemplateEngine {
-  async render(
-    _templateId: string,
-    _variables: Record<string, unknown>,
-  ): Promise<{ title: string; body: string; html?: string }> {
-    return { title: "Rendered title", body: "Rendered template" };
-  }
-
-  async hasTemplate(_templateId: string): Promise<boolean> {
-    return true;
-  }
-
-  async validateVariables(
-    _templateId: string,
-    _variables: Record<string, unknown>,
-  ): Promise<boolean> {
-    return true;
-  }
-}
-
-class _MockEventEmitter implements INotificationEventEmitter {
-  async emit(_event: any): Promise<void> {
-    // Event emitted
-  }
-}
 
 describe("NotificationService - Create", () => {
   let service: NotificationService;
-  let repository: MockRepository;
+  let _repository: MockRepository;
 
   beforeEach(() => {
-    const sender = new MockSender();
-    repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    service = new NotificationService(repository, idGenerator, dateTimeProvider, [sender]);
+    const ctx = createNotificationServiceWithDeps();
+    service = ctx.service;
+    _repository = ctx.repository;
   });
 
   it("should create a notification with PENDING status", async () => {
-    const dto = {
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: {
-        id: "user-123",
-        email: "test@example.com",
-      },
-      content: {
-        title: "Test",
-        body: "Test message",
-      },
-      maxRetries: 3,
-    };
-
-    const notification = await service.create(dto);
+    const notification = await service.create(defaultNotificationDto);
 
     expect(notification.id).toBeDefined();
     expect(notification.status).toBe(NotificationStatus.QUEUED);
@@ -254,40 +95,25 @@ describe("NotificationService - Create", () => {
 
 describe("NotificationService - Send", () => {
   let service: NotificationService;
-  let sender: MockSender;
+  let _sender: MockSender;
   let repository: MockRepository;
 
   beforeEach(() => {
-    sender = new MockSender();
-    repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    service = new NotificationService(repository, idGenerator, dateTimeProvider, [sender]);
+    const ctx = createNotificationServiceWithDeps();
+    _sender = ctx.sender;
+    repository = ctx.repository;
+    service = ctx.service;
   });
 
   it("should send notification successfully", async () => {
-    const dto = {
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: {
-        id: "user-123",
-        email: "test@example.com",
-      },
-      content: {
-        title: "Test",
-        body: "Test message",
-      },
-      maxRetries: 3,
-    };
-
-    const result = await service.send(dto);
+    const result = await service.send(defaultNotificationDto);
 
     expect(result.success).toBe(true);
-    expect(result.providerMessageId).toBe("msg-123");
+    expect(result.providerMessageId).toBe("mock-msg-123");
 
-    // Fetch notification to verify it was updated
-    const notification = await repository.findById(result.notificationId);
+    // Fetch notification to verify it was updated (find the latest one)
+    const notifications = await repository.find({});
+    const notification = notifications[0];
     expect(notification).not.toBeNull();
     expect(notification!.status).toBe(NotificationStatus.SENT);
     expect(notification!.sentAt).toBeDefined();
@@ -312,30 +138,9 @@ describe("NotificationService - Send", () => {
   });
 
   it("should handle send failure and mark as FAILED", async () => {
-    const failingSender = new MockFailingSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
+    const { service: failingService } = createFailingNotificationServiceWithDeps();
 
-    const failingService = new NotificationService(repository, idGenerator, dateTimeProvider, [
-      failingSender,
-    ]);
-
-    const dto = {
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: {
-        id: "user-123",
-        email: "test@example.com",
-      },
-      content: {
-        title: "Test",
-        body: "Test message",
-      },
-      maxRetries: 3,
-    };
-
-    await expect(failingService.send(dto)).rejects.toThrow();
+    await expect(failingService.send(defaultNotificationDto)).rejects.toThrow();
   });
 });
 
@@ -344,31 +149,14 @@ describe("NotificationService - SendById", () => {
   let repository: MockRepository;
 
   beforeEach(() => {
-    const sender = new MockSender();
-    repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    service = new NotificationService(repository, idGenerator, dateTimeProvider, [sender]);
+    const ctx = createNotificationServiceWithDeps();
+    service = ctx.service;
+    repository = ctx.repository;
   });
 
   it("should send existing notification by ID", async () => {
     // First create a notification
-    const dto = {
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: {
-        id: "user-123",
-        email: "test@example.com",
-      },
-      content: {
-        title: "Test",
-        body: "Test message",
-      },
-      maxRetries: 3,
-    };
-
-    const created = await service.create(dto);
+    const created = await service.create(defaultNotificationDto);
 
     // Then send it by ID
     const result = await service.sendById(created.id);
@@ -376,7 +164,7 @@ describe("NotificationService - SendById", () => {
     expect(result.success).toBe(true);
 
     // Verify notification was updated
-    const notification = await repository.findById(result.notificationId);
+    const notification = await repository.findById(created.id);
     expect(notification!.status).toBe(NotificationStatus.SENT);
   });
 
@@ -389,31 +177,14 @@ describe("NotificationService - Query", () => {
   let service: NotificationService;
 
   beforeEach(() => {
-    const sender = new MockSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    service = new NotificationService(repository, idGenerator, dateTimeProvider, [sender]);
+    const ctx = createNotificationServiceWithDeps();
+    service = ctx.service;
   });
 
   it("should query notifications", async () => {
-    // Create some notifications
-    await service.create({
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: { id: "user-1", email: "user1@example.com" },
-      content: { title: "Test 1", body: "Body 1" },
-      maxRetries: 3,
-    });
-
-    await service.create({
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.HIGH,
-      recipient: { id: "user-2", email: "user2@example.com" },
-      content: { title: "Test 2", body: "Body 2" },
-      maxRetries: 3,
-    });
+    // Create some notifications with different priorities
+    await service.create(defaultNotificationDto);
+    await service.create({ ...defaultNotificationDto, priority: NotificationPriority.HIGH });
 
     const results = await service.query({ limit: 10, offset: 0 });
 
@@ -421,13 +192,7 @@ describe("NotificationService - Query", () => {
   });
 
   it("should count notifications", async () => {
-    await service.create({
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: { id: "user-1", email: "user1@example.com" },
-      content: { title: "Test", body: "Body" },
-      maxRetries: 3,
-    });
+    await service.create(defaultNotificationDto);
 
     const count = await service.count({});
     expect(count).toBe(1);
@@ -438,85 +203,61 @@ describe("NotificationService - Retry", () => {
   let _service: NotificationService;
 
   beforeEach(() => {
-    const sender = new MockSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    _service = new NotificationService(repository, idGenerator, dateTimeProvider, [sender]);
+    const ctx = createNotificationServiceWithDeps();
+    _service = ctx.service;
   });
 
   it("should retry failed notification", async () => {
     // Create a failed notification
-    const failingSender = new MockFailingSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    const failingService = new NotificationService(repository, idGenerator, dateTimeProvider, [
-      failingSender,
-    ]);
+    const { service: failingService, repository: failingRepo } =
+      createFailingNotificationServiceWithDeps();
 
     try {
-      await failingService.send({
-        channel: NotificationChannel.EMAIL,
-        priority: NotificationPriority.NORMAL,
-        recipient: { id: "user-1", email: "user1@example.com" },
-        content: { title: "Test", body: "Body" },
-        maxRetries: 3,
-      });
+      await failingService.send(defaultNotificationDto);
     } catch (_error) {
       // Expected to fail
     }
 
     // Find the failed notification
-    const notifications = await repository.find({});
+    const notifications = await failingRepo.find({});
     const failedNotification = notifications[0];
 
     expect(failedNotification).toBeDefined();
     expect(failedNotification!.status).toBe(NotificationStatus.FAILED);
     expect(failedNotification!.retryCount).toBe(1);
 
-    // Now retry with working service
-    const workingSender = new MockSender();
-    const workingService = new NotificationService(repository, idGenerator, dateTimeProvider, [
-      workingSender,
-    ]);
+    // Now retry with working service using same repository
+    const ctx = createNotificationServiceWithDeps();
+    // Override the repository to use the failing service's repository
+    const workingService = new NotificationService(
+      failingRepo,
+      ctx.idGenerator,
+      ctx.dateTimeProvider,
+      [ctx.sender],
+    );
 
     const retryResult = await workingService.retry(failedNotification!.id);
 
     expect(retryResult.success).toBe(true);
 
     // Verify notification was updated
-    const retriedNotification = await repository.findById(retryResult.notificationId);
+    const retriedNotification = await failingRepo.findById(failedNotification!.id);
     expect(retriedNotification!.status).toBe(NotificationStatus.SENT);
     expect(retriedNotification!.retryCount).toBe(1); // Still 1 since retry succeeded
   });
 
   it("should throw error if max retries exceeded", async () => {
-    const failingSender = new MockFailingSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    const failingService = new NotificationService(repository, idGenerator, dateTimeProvider, [
-      failingSender,
-    ]);
+    const { service: failingService, repository: failingRepo } =
+      createFailingNotificationServiceWithDeps();
 
     try {
-      await failingService.send({
-        channel: NotificationChannel.EMAIL,
-        priority: NotificationPriority.NORMAL,
-        recipient: { id: "user-1", email: "user1@example.com" },
-        content: { title: "Test", body: "Body" },
-        maxRetries: 1,
-      });
+      await failingService.send({ ...defaultNotificationDto, maxRetries: 1 });
     } catch (_error) {
       // Expected to fail
     }
 
     // Find the failed notification
-    const notifications = await repository.find({});
+    const notifications = await failingRepo.find({});
     const failedNotification = notifications[0];
 
     expect(failedNotification).toBeDefined();
@@ -538,22 +279,12 @@ describe("NotificationService - Cancel", () => {
   let service: NotificationService;
 
   beforeEach(() => {
-    const sender = new MockSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    service = new NotificationService(repository, idGenerator, dateTimeProvider, [sender]);
+    const ctx = createNotificationServiceWithDeps();
+    service = ctx.service;
   });
 
   it("should cancel pending notification", async () => {
-    const created = await service.create({
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: { id: "user-1", email: "user1@example.com" },
-      content: { title: "Test", body: "Body" },
-      maxRetries: 3,
-    });
+    const created = await service.create(defaultNotificationDto);
 
     const cancelled = await service.cancel(created.id);
 
@@ -567,27 +298,21 @@ describe("NotificationService - Cancel", () => {
 
 describe("NotificationService - MarkAsDelivered", () => {
   let service: NotificationService;
+  let _repository: MockRepository;
 
   beforeEach(() => {
-    const sender = new MockSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
-
-    service = new NotificationService(repository, idGenerator, dateTimeProvider, [sender]);
+    const ctx = createNotificationServiceWithDeps();
+    service = ctx.service;
+    _repository = ctx.repository;
   });
 
   it("should mark notification as delivered", async () => {
-    const result = await service.send({
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: { id: "user-1", email: "user1@example.com" },
-      content: { title: "Test", body: "Body" },
-      maxRetries: 3,
-    });
+    // Create a notification first, then send it
+    const created = await service.create(defaultNotificationDto);
+    await service.sendById(created.id);
 
     const metadata = { deliveryTime: "500ms" };
-    const delivered = await service.markAsDelivered(result.notificationId, metadata);
+    const delivered = await service.markAsDelivered(created.id, metadata);
 
     expect(delivered.status).toBe(NotificationStatus.DELIVERED);
     expect(delivered.deliveredAt).toBeDefined();
@@ -596,31 +321,27 @@ describe("NotificationService - MarkAsDelivered", () => {
 
 describe("NotificationService - Template Rendering", () => {
   it("should render template if template engine provided", async () => {
-    const sender = new MockSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
+    const ctx = createNotificationServiceWithDeps();
     const templateEngine = new MockTemplateEngine();
 
     const service = new NotificationService(
-      repository,
-      idGenerator,
-      dateTimeProvider,
-      [sender],
+      ctx.repository,
+      ctx.idGenerator,
+      ctx.dateTimeProvider,
+      [ctx.sender],
       templateEngine,
     );
 
-    const result = await service.send({
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: { id: "user-1", email: "user1@example.com" },
+    const dto = {
+      ...defaultNotificationDto,
       content: {
         title: "Welcome",
         body: "Welcome {{name}}",
         templateVars: { name: "John" },
       },
-      maxRetries: 3,
-    });
+    };
+
+    const result = await service.send(dto);
 
     expect(result.success).toBe(true);
   });
@@ -646,72 +367,57 @@ describe("NotificationService - Template Rendering", () => {
       }
     }
 
-    const sender = new MockSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
+    const ctx = createNotificationServiceWithDeps();
     const templateEngine = new FailingTemplateEngine();
 
     const service = new NotificationService(
-      repository,
-      idGenerator,
-      dateTimeProvider,
-      [sender],
+      ctx.repository,
+      ctx.idGenerator,
+      ctx.dateTimeProvider,
+      [ctx.sender],
       templateEngine,
     );
 
-    await expect(
-      service.send({
-        channel: NotificationChannel.EMAIL,
-        priority: NotificationPriority.NORMAL,
-        recipient: { id: "user-1", email: "user1@example.com" },
-        content: {
-          title: "Test",
-          body: "Body",
-          templateId: "welcome",
-          templateVars: { name: "John" },
-        },
-        maxRetries: 3,
-      }),
-    ).rejects.toThrow(TemplateError);
+    const dto = {
+      ...defaultNotificationDto,
+      content: {
+        title: "Test",
+        body: "Body",
+        templateId: "welcome",
+        templateVars: { name: "John" },
+      },
+    };
+
+    await expect(service.send(dto)).rejects.toThrow(TemplateError);
   });
 });
 
 describe("NotificationService - Event Emission", () => {
   it("should emit events if event emitter provided", async () => {
-    const emittedEvents: any[] = [];
+    const emittedEvents: unknown[] = [];
 
     class TestEventEmitter implements INotificationEventEmitter {
-      async emit(event: any): Promise<void> {
+      async emit(event: unknown): Promise<void> {
         emittedEvents.push(event);
       }
     }
 
-    const sender = new MockSender();
-    const repository = new MockRepository();
-    const idGenerator = new MockIdGenerator();
-    const dateTimeProvider = new MockDateTimeProvider();
+    const ctx = createNotificationServiceWithDeps();
     const eventEmitter = new TestEventEmitter();
 
     const service = new NotificationService(
-      repository,
-      idGenerator,
-      dateTimeProvider,
-      [sender],
+      ctx.repository,
+      ctx.idGenerator,
+      ctx.dateTimeProvider,
+      [ctx.sender],
       undefined,
       eventEmitter,
     );
 
-    await service.send({
-      channel: NotificationChannel.EMAIL,
-      priority: NotificationPriority.NORMAL,
-      recipient: { id: "user-1", email: "user1@example.com" },
-      content: { title: "Test", body: "Body" },
-      maxRetries: 3,
-    });
+    await service.send(defaultNotificationDto);
 
     expect(emittedEvents.length).toBeGreaterThan(0);
-    expect(emittedEvents.some((e) => e.type === "notification.created")).toBe(true);
-    expect(emittedEvents.some((e) => e.type === "notification.sent")).toBe(true);
+    expect(emittedEvents.some((e) => (e as any).type === "notification.created")).toBe(true);
+    expect(emittedEvents.some((e) => (e as any).type === "notification.sent")).toBe(true);
   });
 });

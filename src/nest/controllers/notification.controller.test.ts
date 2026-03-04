@@ -2,33 +2,12 @@ import { describe, expect, it, beforeEach, jest } from "@jest/globals";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
+import { createMockNotification, defaultNotificationDto } from "../../../test/test-utils";
 import { NotificationNotFoundError, ValidationError } from "../../core/errors";
 import { NotificationChannel, NotificationPriority, NotificationStatus } from "../../core/types";
-import type { Notification } from "../../core/types";
 import { NOTIFICATION_KIT_OPTIONS, NOTIFICATION_SERVICE } from "../constants";
 
 import { NotificationController } from "./notification.controller";
-
-// Mock notification service
-const createMockNotif = (overrides = {}): Notification => ({
-  id: "notif-123",
-  channel: NotificationChannel.EMAIL,
-  priority: NotificationPriority.NORMAL,
-  status: NotificationStatus.PENDING,
-  recipient: {
-    id: "user-123",
-    email: "test@example.com",
-  },
-  content: {
-    title: "Test",
-    body: "Test body",
-  },
-  maxRetries: 3,
-  retryCount: 0,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  ...overrides,
-});
 
 describe("NotificationController", () => {
   let controller: NotificationController;
@@ -66,31 +45,17 @@ describe("NotificationController", () => {
 
   describe("send", () => {
     it("should send notification successfully", async () => {
-      const dto = {
-        channel: NotificationChannel.EMAIL,
-        priority: NotificationPriority.NORMAL,
-        recipient: {
-          id: "user-123",
-          email: "test@example.com",
-        },
-        content: {
-          title: "Test",
-          body: "Test body",
-        },
-        maxRetries: 3,
-      };
-
       mockService.send.mockResolvedValue({
         success: true,
         notificationId: "notif-123",
         providerMessageId: "msg-456",
       });
 
-      const result = await controller.send(dto);
+      const result = await controller.send(defaultNotificationDto);
 
       expect(result.success).toBe(true);
       expect(result.notificationId).toBe("notif-123");
-      expect(mockService.send).toHaveBeenCalledWith(dto);
+      expect(mockService.send).toHaveBeenCalledWith(defaultNotificationDto);
     });
 
     it("should throw BadRequestException on validation error", async () => {
@@ -131,7 +96,7 @@ describe("NotificationController", () => {
 
       mockService.send.mockResolvedValue({
         success: true,
-        notification: createMockNotif(),
+        notification: createMockNotification(),
       });
 
       const result = await controller.bulkSend(dto);
@@ -158,7 +123,7 @@ describe("NotificationController", () => {
       };
 
       mockService.send
-        .mockResolvedValueOnce({ success: true, notification: createMockNotif() })
+        .mockResolvedValueOnce({ success: true, notification: createMockNotification() })
         .mockRejectedValueOnce(new Error("Send failed"));
 
       const result = await controller.bulkSend(dto);
@@ -171,34 +136,20 @@ describe("NotificationController", () => {
 
   describe("create", () => {
     it("should create notification without sending", async () => {
-      const dto = {
-        channel: NotificationChannel.EMAIL,
-        priority: NotificationPriority.NORMAL,
-        recipient: {
-          id: "user-123",
-          email: "test@example.com",
-        },
-        content: {
-          title: "Test",
-          body: "Test body",
-        },
-        maxRetries: 3,
-      };
-
-      const notification = createMockNotif();
+      const notification = createMockNotification();
       mockService.create.mockResolvedValue(notification);
 
-      const result = await controller.create(dto);
+      const result = await controller.create(defaultNotificationDto);
 
       expect(result.id).toBe("notif-123");
       expect(result.status).toBe(NotificationStatus.PENDING);
-      expect(mockService.create).toHaveBeenCalledWith(dto);
+      expect(mockService.create).toHaveBeenCalledWith(defaultNotificationDto);
     });
   });
 
   describe("getById", () => {
     it("should get notification by ID", async () => {
-      const notification = createMockNotif();
+      const notification = createMockNotification();
       mockService.getById.mockResolvedValue(notification);
 
       const result = await controller.getById("notif-123");
@@ -216,7 +167,7 @@ describe("NotificationController", () => {
 
   describe("query", () => {
     it("should query notifications with pagination", async () => {
-      const notifications = [createMockNotif(), createMockNotif({ id: "notif-456" })];
+      const notifications = [createMockNotification(), createMockNotification({ id: "notif-456" })];
       mockService.query.mockResolvedValue(notifications);
       mockService.count.mockResolvedValue(2);
 
@@ -259,7 +210,7 @@ describe("NotificationController", () => {
 
   describe("retry", () => {
     it("should retry failed notification", async () => {
-      const notification = createMockNotif({ status: NotificationStatus.SENT });
+      const notification = createMockNotification({ status: NotificationStatus.SENT });
       mockService.retry.mockResolvedValue({
         success: true,
         notification,
@@ -280,7 +231,7 @@ describe("NotificationController", () => {
 
   describe("cancel", () => {
     it("should cancel notification", async () => {
-      const notification = createMockNotif({ status: NotificationStatus.CANCELLED });
+      const notification = createMockNotification({ status: NotificationStatus.CANCELLED });
       mockService.cancel.mockResolvedValue(notification);
 
       const result = await controller.cancel("notif-123");
@@ -298,9 +249,9 @@ describe("NotificationController", () => {
 
   describe("markAsDelivered", () => {
     it("should mark notification as delivered", async () => {
-      const notification = createMockNotif({
+      const notification = createMockNotification({
         status: NotificationStatus.DELIVERED,
-        deliveredAt: new Date(),
+        deliveredAt: new Date().toISOString(),
       });
       mockService.markAsDelivered.mockResolvedValue(notification);
 

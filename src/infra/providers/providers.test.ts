@@ -48,17 +48,6 @@ describe("ObjectIdGenerator", () => {
 
     expect(ids.size).toBe(100);
   });
-
-  it("should generate unique IDs", () => {
-    const generator = new ObjectIdGenerator();
-    const ids = new Set();
-
-    for (let i = 0; i < 100; i++) {
-      ids.add(generator.generate());
-    }
-
-    expect(ids.size).toBe(100);
-  });
 });
 
 describe("DateTimeProvider", () => {

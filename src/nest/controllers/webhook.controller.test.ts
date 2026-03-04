@@ -2,32 +2,12 @@ import { describe, expect, it, beforeEach, jest } from "@jest/globals";
 import { UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
+import { createMockNotification } from "../../../test/test-utils";
 import { NotificationNotFoundError } from "../../core/errors";
-import { NotificationChannel, NotificationPriority, NotificationStatus } from "../../core/types";
-import type { Notification } from "../../core/types";
+import { NotificationStatus } from "../../core/types";
 import { NOTIFICATION_KIT_OPTIONS, NOTIFICATION_SERVICE } from "../constants";
 
 import { WebhookController } from "./webhook.controller";
-
-const createMockNotif = (overrides = {}): Notification => ({
-  id: "notif-123",
-  channel: NotificationChannel.EMAIL,
-  priority: NotificationPriority.NORMAL,
-  status: NotificationStatus.SENT,
-  recipient: {
-    id: "user-123",
-    email: "test@example.com",
-  },
-  content: {
-    title: "Test",
-    body: "Test body",
-  },
-  maxRetries: 3,
-  retryCount: 0,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  ...overrides,
-});
 
 describe("WebhookController", () => {
   let controller: WebhookController;
@@ -69,7 +49,7 @@ describe("WebhookController", () => {
         metadata: { deliveryTime: "500ms" },
       };
 
-      const notification = createMockNotif({ status: NotificationStatus.DELIVERED });
+      const notification = createMockNotification({ status: NotificationStatus.DELIVERED });
       mockService.markAsDelivered.mockResolvedValue(notification);
 
       const result = await controller.handleWebhook("test-secret-123", undefined, payload);
@@ -95,7 +75,7 @@ describe("WebhookController", () => {
         },
       ];
 
-      mockService.markAsDelivered.mockResolvedValue(createMockNotif());
+      mockService.markAsDelivered.mockResolvedValue(createMockNotification());
 
       const result = await controller.handleWebhook("test-secret-123", undefined, payloads);
 
@@ -132,7 +112,7 @@ describe("WebhookController", () => {
         status: "failed" as const,
       };
 
-      const notification = createMockNotif({ retryCount: 1, maxRetries: 3 });
+      const notification = createMockNotification({ retryCount: 1, maxRetries: 3 });
       mockService.getById.mockResolvedValue(notification);
       mockService.retry.mockResolvedValue({ success: true, notification });
 
@@ -148,7 +128,7 @@ describe("WebhookController", () => {
         status: "failed" as const,
       };
 
-      const notification = createMockNotif({ retryCount: 3, maxRetries: 3 });
+      const notification = createMockNotification({ retryCount: 3, maxRetries: 3 });
       mockService.getById.mockResolvedValue(notification);
 
       const result = await controller.handleWebhook("test-secret-123", undefined, payload);
@@ -163,7 +143,7 @@ describe("WebhookController", () => {
         status: "bounced" as const,
       };
 
-      const notification = createMockNotif({ retryCount: 0, maxRetries: 3 });
+      const notification = createMockNotification({ retryCount: 0, maxRetries: 3 });
       mockService.getById.mockResolvedValue(notification);
       mockService.retry.mockResolvedValue({ success: true, notification });
 
@@ -221,7 +201,7 @@ describe("WebhookController", () => {
       ];
 
       mockService.markAsDelivered
-        .mockResolvedValueOnce(createMockNotif())
+        .mockResolvedValueOnce(createMockNotification())
         .mockRejectedValueOnce(new NotificationNotFoundError("nonexistent"));
 
       const result = await controller.handleWebhook("test-secret-123", undefined, payloads);
@@ -258,7 +238,7 @@ describe("WebhookController", () => {
         status: "delivered" as const,
       };
 
-      mockService.markAsDelivered.mockResolvedValue(createMockNotif());
+      mockService.markAsDelivered.mockResolvedValue(createMockNotification());
 
       // Should not throw without secret
       const result = await noSecretController.handleWebhook(undefined, undefined, payload);

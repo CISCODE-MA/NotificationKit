@@ -2,84 +2,12 @@ import { describe, expect, it, beforeAll } from "@jest/globals";
 import { Test } from "@nestjs/testing";
 
 import type { NotificationService } from "../src/core/notification.service";
-import type { INotificationSender, INotificationRepository } from "../src/core/ports";
+import type { INotificationSender } from "../src/core/ports";
 import { NotificationChannel, NotificationPriority, NotificationStatus } from "../src/core/types";
-import type { Notification } from "../src/core/types";
 import { NOTIFICATION_SERVICE } from "../src/nest/constants";
 import { NotificationKitModule } from "../src/nest/module";
 
-// Mock repository for testing (in real apps, use @ciscode/notification-kit-mongodb or similar)
-class MockRepository implements INotificationRepository {
-  private notifications: Map<string, Notification> = new Map();
-  private idCounter = 0;
-
-  async create(data: Omit<Notification, "id" | "createdAt" | "updatedAt">): Promise<Notification> {
-    const notification: Notification = {
-      ...data,
-      id: `notif_${++this.idCounter}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    this.notifications.set(notification.id, notification);
-    return notification;
-  }
-
-  async findById(id: string): Promise<Notification | null> {
-    return this.notifications.get(id) || null;
-  }
-
-  async find(criteria?: any): Promise<Notification[]> {
-    let results = Array.from(this.notifications.values());
-
-    if (criteria) {
-      if (criteria.status) {
-        results = results.filter((n) => n.status === criteria.status);
-      }
-      if (criteria.channel) {
-        results = results.filter((n) => n.channel === criteria.channel);
-      }
-      if (criteria.recipientId) {
-        results = results.filter((n) => n.recipient.id === criteria.recipientId);
-      }
-    }
-
-    return results;
-  }
-
-  async update(id: string, updates: Partial<Notification>): Promise<Notification> {
-    const notification = this.notifications.get(id);
-    if (!notification) throw new Error("Not found");
-    const updated = { ...notification, ...updates, updatedAt: new Date().toISOString() };
-    this.notifications.set(id, updated);
-    return updated;
-  }
-
-  async count(criteria?: any): Promise<number> {
-    if (!criteria) return this.notifications.size;
-    const results = await this.find(criteria);
-    return results.length;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    return this.notifications.delete(id);
-  }
-
-  async findReadyToSend(): Promise<Notification[]> {
-    return Array.from(this.notifications.values()).filter(
-      (n) => n.status === NotificationStatus.PENDING,
-    );
-  }
-
-  // Test helper methods
-  clear(): void {
-    this.notifications.clear();
-    this.idCounter = 0;
-  }
-
-  getAll(): Notification[] {
-    return Array.from(this.notifications.values());
-  }
-}
+import { MockRepository } from "./test-utils";
 
 /**
  * Integration tests for the complete NotificationKit flow
