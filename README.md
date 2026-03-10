@@ -1,6 +1,6 @@
 # @ciscode/notification-kit
 
-> A flexible, type-safe notification system for NestJS applications supporting multiple channels (Email, SMS, Push) with pluggable providers.
+> A flexible, type-safe notification system for NestJS applications supporting multiple channels (Email, SMS, Push, WhatsApp) with pluggable providers.
 
 [![npm version](https://img.shields.io/npm/v/@ciscode/notification-kit.svg)](https://www.npmjs.com/package/@ciscode/notification-kit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,8 +8,9 @@
 
 ## ✨ Features
 
-- 🚀 **Multi-Channel Support** - Email, SMS, and Push notifications in one unified interface
+- 🚀 **Multi-Channel Support** - Email, SMS, Push, and WhatsApp notifications in one unified interface
 - 🔌 **Pluggable Providers** - Support for multiple providers (Twilio, AWS SNS, Firebase, Nodemailer, etc.)
+- 📱 **WhatsApp Support** - Send WhatsApp messages with media support via Twilio API
 - 🎯 **NestJS First** - Built specifically for NestJS with dependency injection support
 - 📦 **Framework Agnostic Core** - Clean architecture with framework-independent domain logic
 - 🔄 **Retry & Queue Management** - Built-in retry logic and notification state management
@@ -38,6 +39,9 @@ npm install nodemailer
 npm install twilio                    # Twilio
 npm install @aws-sdk/client-sns       # AWS SNS
 npm install @vonage/server-sdk        # Vonage
+
+# For WhatsApp
+npm install twilio                    # Twilio WhatsApp API
 
 # For push notifications (choose one)
 npm install firebase-admin            # Firebase
@@ -148,7 +152,132 @@ POST /notifications/:id/retry
 POST /notifications/:id/cancel
 ```
 
-## 📚 Documentation
+## � WhatsApp Support
+
+NotificationKit now supports WhatsApp messaging via Twilio's WhatsApp API with full media and template support!
+
+### Setup WhatsApp Sender
+
+```typescript
+import { TwilioWhatsAppSender, MockWhatsAppSender } from "@ciscode/notification-kit";
+
+// For production (real Twilio API)
+NotificationKitModule.register({
+  senders: [
+    new TwilioWhatsAppSender({
+      accountSid: process.env.TWILIO_ACCOUNT_SID,
+      authToken: process.env.TWILIO_AUTH_TOKEN,
+      fromNumber: process.env.TWILIO_WHATSAPP_FROM, // e.g., '+14155238886'
+      templates: {
+        orderShipped: "order_shipped_v1",
+        welcomeMessage: "welcome_v2",
+      },
+    }),
+  ],
+  // ... other config
+});
+
+// For development/testing (no credentials needed)
+NotificationKitModule.register({
+  senders: [new MockWhatsAppSender({ logMessages: true })],
+  // ... other config
+});
+```
+
+### Send WhatsApp Messages
+
+#### Basic Text Message
+
+```typescript
+await notificationService.send({
+  channel: NotificationChannel.WHATSAPP,
+  priority: NotificationPriority.HIGH,
+  recipient: {
+    id: "user-123",
+    phone: "+14155551234", // E.164 format required
+  },
+  content: {
+    title: "Order Update",
+    body: "Your order #12345 has been shipped!",
+  },
+});
+```
+
+#### WhatsApp with Media (Images/PDFs/Videos)
+
+```typescript
+await notificationService.send({
+  channel: NotificationChannel.WHATSAPP,
+  recipient: {
+    id: "user-456",
+    phone: "+447911123456",
+  },
+  content: {
+    title: "Invoice Ready",
+    body: "Your invoice is attached",
+    data: {
+      mediaUrl: "https://example.com/invoice.pdf",
+    },
+  },
+});
+```
+
+#### WhatsApp with Templates
+
+```typescript
+await notificationService.send({
+  channel: NotificationChannel.WHATSAPP,
+  recipient: {
+    id: "user-789",
+    phone: "+212612345678",
+  },
+  content: {
+    title: "OTP Code",
+    body: "Your verification code is {{code}}",
+    templateId: "otp_verification",
+    templateVars: {
+      code: "123456",
+      expiryMinutes: "5",
+    },
+  },
+});
+```
+
+### WhatsApp Requirements
+
+- **Phone Format**: Must be E.164 format (`+[country code][number]`)
+  - ✅ Valid: `+14155551234`, `+447911123456`, `+212612345678`
+  - ❌ Invalid: `4155551234`, `+1-415-555-1234`, `+1 (415) 555-1234`
+- **Twilio Account**: Required for production use
+- **WhatsApp Opt-in**: Recipients must opt-in to receive messages (send "join [code]" to Twilio number)
+- **Media Support**: Images, videos, audio, PDFs (max 16MB for videos, 5MB for images)
+- **Templates**: Some message types require pre-approved WhatsApp templates
+
+### Testing WhatsApp Without Twilio
+
+Use `MockWhatsAppSender` for development:
+
+```typescript
+const mockSender = new MockWhatsAppSender({ logMessages: true });
+
+// Simulates sending and logs to console
+// No actual API calls or credentials needed
+```
+
+Console output example:
+
+```
+═══════════════════════════════════════════
+📱 [MockWhatsApp] Simulating WhatsApp send
+═══════════════════════════════════════════
+To: +14155551234
+Recipient ID: user-123
+
+💬 Message: Your order has been shipped!
+═══════════════════════════════════════════
+```
+
+## �📚 Documentation
 
 ### Core Concepts
 
@@ -157,6 +286,7 @@ POST /notifications/:id/cancel
 - **EMAIL** - Email notifications via SMTP providers
 - **SMS** - Text messages via SMS gateways
 - **PUSH** - Mobile push notifications
+- **WHATSAPP** - WhatsApp messages via Twilio or Meta Business API
 - **WEBHOOK** - HTTP callbacks (coming soon)
 
 #### Notification Status Lifecycle
@@ -187,6 +317,11 @@ CANCELLED
 - **TwilioSmsSender** - Twilio SMS service
 - **AwsSnsSender** - AWS SNS for SMS
 - **VonageSmsSender** - Vonage (formerly Nexmo)
+
+#### WhatsApp Senders
+
+- **TwilioWhatsAppSender** - Twilio WhatsApp API (supports media & templates)
+- **MockWhatsAppSender** - Mock sender for testing without credentials
 
 #### Push Notification Senders
 
