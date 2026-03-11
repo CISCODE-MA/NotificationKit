@@ -1,6 +1,6 @@
-# Contributing to <PACKAGE_NAME>
+# Contributing to @ciscode/notification-kit
 
-Thank you for your interest in contributing to **<PACKAGE_NAME>** 💙  
+Thank you for your interest in contributing to **@ciscode/notification-kit** 💙  
 Contributions of all kinds are welcome: bug fixes, improvements, documentation, and discussions.
 
 ---
@@ -67,10 +67,49 @@ npm test
 npm run build
 ```
 
-If you add or modify logic:
+### Testing Guidelines
 
-• Add unit tests for behaviour changes.
-• Avoid live external API calls in tests.
+This project maintains high test coverage (133+ tests). When contributing:
+
+**For bug fixes:**
+
+- Add a test that reproduces the bug
+- Verify the fix resolves the issue
+- Ensure existing tests still pass
+
+**For new features:**
+
+- Add unit tests for core business logic
+- Add integration tests for end-to-end workflows
+- Test error cases and edge cases
+- Use shared test utilities from `test/test-utils.ts`
+
+**Testing best practices:**
+
+- Keep tests independent and isolated
+- Use descriptive test names: `it('should [expected behavior]')`
+- Avoid live external API calls - use mocks
+- Test both success and failure scenarios
+- Aim for at least 80% code coverage
+
+**Available test utilities:**
+
+```typescript
+import {
+  createNotificationServiceWithDeps,
+  MockRepository,
+  MockSender,
+  defaultNotificationDto,
+} from "./test/test-utils";
+```
+
+**Running specific test suites:**
+
+```bash
+npm test -- notification.service.test.ts  # Run specific file
+npm run test:watch                         # Watch mode
+npm run test:cov                           # With coverage
+```
 
 ---
 
@@ -81,7 +120,8 @@ When opening a PR:
 • Clearly describe what was changed and why
 • Keep PRs focused on a single concern
 • Reference related issues if applicable
-• Update docummentation if APIs or behaviour change
+• Update documentation if APIs or behaviour change
+• Ensure all tests pass and coverage is maintained
 
 A maintainer may ask for changes or clarification before merging.
 
