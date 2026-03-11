@@ -106,21 +106,16 @@ export class NotificationKitModule {
    * ```
    */
   static register(options: NotificationKitModuleOptions): DynamicModule {
-    // Create all providers (NotificationService + dependencies)
     const providers = this.createProviders(options);
-
-    // Create controllers if enabled (REST API + webhooks)
     const controllers = this.createControllers(options);
-
-    // Export providers so they can be injected in other modules
     const exports = providers.map((p) => (typeof p === "object" && "provide" in p ? p.provide : p));
 
     return {
-      global: true, // Module is global (providers available everywhere)
-      module: NotificationKitModule, // This module class
-      controllers, // REST API + webhook controllers (if enabled)
-      providers, // All services and dependencies
-      exports, // Make providers available for injection
+      global: true,
+      module: NotificationKitModule,
+      controllers,
+      providers,
+      exports,
     };
   }
 
@@ -165,37 +160,29 @@ export class NotificationKitModule {
    * You can add them manually in a separate module if needed.
    */
   static registerAsync(options: NotificationKitModuleAsyncOptions): DynamicModule {
-    // Create provider that resolves module options asynchronously
     const asyncOptionsProvider = this.createAsyncOptionsProvider(options);
-
-    // Create any additional async providers (useClass providers)
     const asyncProviders = this.createAsyncProviders(options);
 
-    // Create a factory provider that creates NotificationKit providers
-    // once the module options are available
     const providersFactory: Provider = {
       provide: "NOTIFICATION_PROVIDERS",
       useFactory: (moduleOptions: NotificationKitModuleOptions) => {
         return createNotificationKitProviders(moduleOptions);
       },
-      inject: [NOTIFICATION_KIT_OPTIONS], // Wait for options to be resolved
+      inject: [NOTIFICATION_KIT_OPTIONS],
     };
 
-    // Combine all providers
     const allProviders = [asyncOptionsProvider, ...asyncProviders, providersFactory];
-
-    // Export providers for injection
     const exports = allProviders.map((p) =>
       typeof p === "object" && "provide" in p ? p.provide : p,
     );
 
     return {
-      global: true, // Module is global
-      module: NotificationKitModule, // This module class
-      imports: options.imports || [], // Import dependencies (ConfigModule, etc.)
+      global: true,
+      module: NotificationKitModule,
+      imports: options.imports || [],
       controllers: [], // Controllers disabled in async mode for simplicity
-      providers: allProviders, // Async providers + factory
-      exports, // Make providers available for injection
+      providers: allProviders,
+      exports,
     };
   }
 
@@ -215,12 +202,10 @@ export class NotificationKitModule {
    */
   private static createProviders(options: NotificationKitModuleOptions): Provider[] {
     return [
-      // Provide options object (injectable as NOTIFICATION_KIT_OPTIONS)
       {
         provide: NOTIFICATION_KIT_OPTIONS,
         useValue: options,
       },
-      // Create all NotificationKit providers (service + dependencies)
       ...createNotificationKitProviders(options),
     ];
   }
@@ -303,38 +288,34 @@ export class NotificationKitModule {
    * @private
    */
   private static createAsyncOptionsProvider(options: NotificationKitModuleAsyncOptions): Provider {
-    // Pattern 1: useFactory - Factory function that returns options
     if (options.useFactory) {
       return {
         provide: NOTIFICATION_KIT_OPTIONS,
         useFactory: options.useFactory,
-        inject: options.inject || [], // Dependencies to inject into factory
+        inject: options.inject || [],
       };
     }
 
-    // Pattern 2: useExisting - Call createNotificationKitOptions() on existing provider
     if (options.useExisting) {
       return {
         provide: NOTIFICATION_KIT_OPTIONS,
         useFactory: async (optionsFactory: NotificationKitOptionsFactory) => {
           return optionsFactory.createNotificationKitOptions();
         },
-        inject: [options.useExisting], // Inject the existing provider
+        inject: [options.useExisting],
       };
     }
 
-    // Pattern 3: useClass - Instantiate class and call createNotificationKitOptions()
     if (options.useClass) {
       return {
         provide: NOTIFICATION_KIT_OPTIONS,
         useFactory: async (optionsFactory: NotificationKitOptionsFactory) => {
           return optionsFactory.createNotificationKitOptions();
         },
-        inject: [options.useClass], // Inject the new class instance
+        inject: [options.useClass],
       };
     }
 
-    // No valid async pattern provided
     throw new Error("Invalid NotificationKitModuleAsyncOptions");
   }
 }
