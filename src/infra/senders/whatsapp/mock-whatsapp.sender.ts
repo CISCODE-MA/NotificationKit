@@ -35,6 +35,8 @@
  * ```
  */
 
+import { randomUUID } from "node:crypto";
+
 import type {
   INotificationSender,
   NotificationChannel,
@@ -129,7 +131,7 @@ export class MockWhatsAppSender implements INotificationSender {
     return {
       success: true,
       notificationId: _recipient.id,
-      providerMessageId: `mock-whatsapp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      providerMessageId: `mock-whatsapp-${randomUUID()}`,
       metadata: {
         status: "sent",
         mock: true,
