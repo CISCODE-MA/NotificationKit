@@ -1,6 +1,6 @@
 # @ciscode/notification-kit
 
-> A flexible, type-safe notification system for NestJS applications supporting multiple channels (Email, SMS, Push, WhatsApp) with pluggable providers.
+> A lightweight, delivery-focused notification library for NestJS. Send notifications through multiple channels (Email, SMS, Push, WhatsApp) with pluggable providers. **Your app manages content and templates, NotificationKit handles delivery.**
 
 [![npm version](https://img.shields.io/npm/v/@ciscode/notification-kit.svg)](https://www.npmjs.com/package/@ciscode/notification-kit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,6 +8,7 @@
 
 ## ✨ Features
 
+- 🎯 **Lightweight & Focused** - Does one thing well: delivers notifications. No bloat, no unnecessary dependencies.
 - 🚀 **Multi-Channel Support** - Email, SMS, Push, and WhatsApp notifications in one unified interface
 - 🔌 **Pluggable Providers** - Support for multiple providers (Twilio, AWS SNS, Firebase, Nodemailer, etc.)
 - 📱 **WhatsApp Support** - Send WhatsApp messages with media support via Twilio API
@@ -15,10 +16,11 @@
 - 📦 **Framework Agnostic Core** - Clean architecture with framework-independent domain logic
 - 🔄 **Retry & Queue Management** - Built-in retry logic and notification state management
 - 📊 **Event System** - Track notification lifecycle with event emitters
-- 🎨 **Template Support** - Handlebars and simple template engines included
 - 💾 **Flexible Storage** - MongoDB, PostgreSQL, or custom repository implementations
 - ✅ **Fully Tested** - Comprehensive test suite with 133+ tests
 - 🔒 **Type Safe** - Written in TypeScript with full type definitions
+
+> **📐 Design Philosophy**: NotificationKit is a **delivery library**, not a content management system. Your application should manage templates, content, and business logic. NotificationKit focuses solely on reliable multi-channel delivery.
 
 ## 📦 Installation
 
@@ -416,14 +418,7 @@ NotificationKitModule.registerAsync({
       }),
     ],
     repository: new MongooseNotificationRepository(/* connection */),
-    templateEngine: new HandlebarsTemplateEngine({
-      templates: {
-        welcome: {
-          title: "Welcome {{name}}!",
-          body: "Hello {{name}}, thanks for joining {{appName}}!",
-        },
-      },
-    }),
+    // templateEngine: optional - most apps manage templates in backend
     eventEmitter: new InMemoryEventEmitter(),
   }),
   inject: [ConfigService],
@@ -452,36 +447,73 @@ eventEmitter.on("*", (event) => {
 });
 ```
 
-### Template Rendering
+### Content Management
+
+> ⚠️ **Best Practice**: Manage templates and content in your backend application, not in NotificationKit. Your app knows your business logic, user preferences, and localization needs better than a delivery library.
+
+**Recommended Approach** (Render in Your Backend):
 
 ```typescript
-import { HandlebarsTemplateEngine } from "@ciscode/notification-kit/infra";
+@Injectable()
+export class NotificationService {
+  constructor(
+    private templateService: TemplateService, // Your template service
+    private notificationKit: NotificationService, // From NotificationKit
+  ) {}
 
-const templateEngine = new HandlebarsTemplateEngine({
-  templates: {
+  async sendWelcomeEmail(user: User) {
+    // 1. Your backend renders the template
+    const content = await this.templateService.render("welcome", {
+      name: user.name,
+      appName: "MyApp",
+    });
+
+    // 2. NotificationKit delivers it
+    await this.notificationKit.send({
+      channel: NotificationChannel.EMAIL,
+      recipient: { id: user.id, email: user.email },
+      content: {
+        title: content.subject,
+        body: content.text,
+        html: content.html,
+      },
+    });
+  }
+}
+```
+
+**Built-in Template Engine** (Optional, for simple use cases):
+
+NotificationKit includes optional template engines for quick prototyping:
+
+```typescript
+import { SimpleTemplateEngine } from "@ciscode/notification-kit/infra";
+
+// Only use for demos/prototyping
+NotificationKitModule.register({
+  templateEngine: new SimpleTemplateEngine({
     welcome: {
       title: "Welcome {{name}}!",
       body: "Hello {{name}}, welcome to {{appName}}!",
-      html: "<h1>Welcome {{name}}!</h1><p>Thanks for joining {{appName}}!</p>",
     },
-  },
+  }),
 });
 
-// Use in notification
+// Send using template
 await notificationService.send({
-  channel: NotificationChannel.EMAIL,
-  recipient: { id: "user-123", email: "user@example.com" },
   content: {
     templateId: "welcome",
-    templateVars: {
-      name: "John Doe",
-      appName: "My App",
-    },
+    templateVars: { name: "John", appName: "MyApp" },
   },
 });
 ```
 
 ### Webhook Handling
+
+> **Note**: Built-in templates are optional and best suited for prototyping. Production apps should manage templates in the backend for flexibility, versioning, and localization. See [Template Configuration Guide](./docs/TEMPLATE_CONFIGURATION.md) for details.
+
+````
+
 
 Enable webhook endpoints to receive delivery notifications from providers:
 
@@ -491,7 +523,7 @@ NotificationKitModule.register({
   webhookSecret: process.env.WEBHOOK_SECRET,
   // ... other options
 });
-```
+````
 
 Webhook endpoint: `POST /notifications/webhook`
 

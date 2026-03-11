@@ -1,10 +1,73 @@
 # Template Configuration Guide
 
-This guide explains how to configure templates in NotificationKit for different channels.
+> ⚠️ **Important Design Principle**: NotificationKit is a **delivery-focused library**, not a content management system. For production applications, you should manage templates in your backend application where you have full control over content, localization, versioning, and business logic.
+
+This guide explains template configuration in NotificationKit for different scenarios:
+
+- **Provider templates** (required for WhatsApp) - Always needed
+- **Built-in template engine** (optional) - Use only for prototyping
+
+## When to Use Built-in Templates
+
+**✅ Good for:**
+
+- Quick prototypes and demos
+- Simple use cases with static templates
+- Learning and testing NotificationKit
+
+**❌ Not recommended for:**
+
+- Production applications
+- Multi-language support
+- Content that changes frequently
+- Complex personalization logic
+- A/B testing content
+- Template versioning and history
+
+## Recommended: Manage Templates in Your Backend
+
+For production apps, manage templates in your backend:
+
+```typescript
+// Your backend handles templates
+@Injectable()
+export class EmailService {
+  async sendWelcome(user: User) {
+    // 1. Load & render template from YOUR system (DB, CMS, files)
+    const template = await this.templateRepo.findByName("welcome");
+    const content = await this.renderEngine.render(template, {
+      name: user.name,
+      locale: user.locale,
+    });
+
+    // 2. NotificationKit delivers pre-rendered content
+    await this.notificationService.send({
+      channel: NotificationChannel.EMAIL,
+      recipient: { id: user.id, email: user.email },
+      content: {
+        title: content.subject,
+        body: content.text,
+        html: content.html,
+      },
+    });
+  }
+}
+```
+
+**Benefits:**
+
+- ✅ Update templates without redeploying code
+- ✅ Store in database with version history
+- ✅ Use any template engine (Handlebars, Pug, EJS, React Email, etc.)
+- ✅ Implement i18n properly
+- ✅ A/B test different content
+- ✅ Separate concerns: content vs delivery
+
+---
 
 ## Two Template Systems
 
-NotificationKit uses **two different template systems**:
+NotificationKit provides **two optional template systems** for simple use cases:
 
 1. **Provider-Specific Templates** - Channel-specific templates (e.g., WhatsApp/Twilio templates)
 2. **Global Template Engine** - Cross-channel template system for dynamic content
@@ -417,7 +480,33 @@ await notificationService.send({
 When sending a notification with a `templateId`:
 
 1. **Check provider-specific templates first** (e.g., WhatsApp sender's `templates` map)
+
+### 🎯 Primary Recommendation: Backend Template Management
+
+**For production applications**, manage templates in your backend:
+
+```typescript
+// ✅ Best: Full control in your backend
+class TemplateService {
+  async render(name: string, vars: any, locale: string) {
+    const template = await this.db.templates.findOne({ name, locale });
+    return this.engine.render(template, vars);
+  }
+}
+```
+
+**Benefits:**
+
+- Update templates without code deployment
+- Store in database with full audit trail
+- Support multiple languages properly
+- A/B test content variations
+- Use any template engine you prefer
+
 2. **Fall back to global template engine** if not found in provider
+
+- **Manage templates in your backend** for production apps (recommended)
+
 3. **Use raw content** if no templates match
 
 ---
@@ -426,9 +515,12 @@ When sending a notification with a `templateId`:
 
 ### ✅ Do:
 
+- Use built-in templates for production (manage in backend instead)
 - Use **provider templates** for WhatsApp (required by Twilio/Meta)
-- Use **global template engine** for Email/SMS/Push
-- Keep templates **simple and reusable**
+- Pass **pre-rendered content** to NotificationKit
+- Use built-in templates **only for prototypes/demos**
+- Keep templates **simple and reusable** (if using built-in)
+- Store production templates in NotificationKit config
 - Test templates with **real data**
 - Version your templates (e.g., `welcome_v2`)
 
