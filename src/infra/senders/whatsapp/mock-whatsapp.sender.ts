@@ -129,7 +129,7 @@ export class MockWhatsAppSender implements INotificationSender {
     return {
       success: true,
       notificationId: _recipient.id,
-      providerMessageId: `mock-whatsapp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      providerMessageId: `mock-whatsapp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       metadata: {
         status: "sent",
         mock: true,
