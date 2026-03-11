@@ -135,62 +135,37 @@ const pushSender = new AwsSnsPushSender({
 
 ## 💾 Repositories
 
-> **Note**: Repository implementations are provided by separate database packages.
-> Install the appropriate package for your database:
-
-### MongoDB
-
-Install the MongoDB package:
-
-```bash
-npm install @ciscode/notification-kit-mongodb
-```
+### MongoDB with Mongoose
 
 ```typescript
-import { MongooseNotificationRepository } from "@ciscode/notification-kit-mongodb";
 import mongoose from "mongoose";
+import { MongooseNotificationRepository } from "@ciscode/notification-kit/infra";
 
 const connection = await mongoose.createConnection("mongodb://localhost:27017/mydb");
-const repository = new MongooseNotificationRepository(connection);
+
+const repository = new MongooseNotificationRepository(
+  connection,
+  "notifications", // collection name (optional)
+);
 ```
 
-### PostgreSQL
+**Peer Dependency**: `mongoose`
 
-Install the PostgreSQL package:
-
-```bash
-npm install @ciscode/notification-kit-postgres
-```
-
-### Custom Repository
-
-Implement the `INotificationRepository` interface:
+### In-Memory (Testing)
 
 ```typescript
-import type { INotificationRepository, Notification } from "@ciscode/notification-kit";
+import { InMemoryNotificationRepository } from "@ciscode/notification-kit/infra";
 
-class MyCustomRepository implements INotificationRepository {
-  async create(data: Omit<Notification, "id" | "createdAt" | "updatedAt">): Promise<Notification> {
-    // Your implementation
-  }
+const repository = new InMemoryNotificationRepository();
 
-  async findById(id: string): Promise<Notification | null> {
-    // Your implementation
-  }
+// For testing - clear all data
+repository.clear();
 
-  // ... implement other methods
-}
+// For testing - get all notifications
+const all = repository.getAll();
 ```
 
-### Schema Reference
-
-The MongoDB schema is exported as a reference:
-
-```typescript
-import { notificationSchemaDefinition } from "@ciscode/notification-kit/infra";
-
-// Use this as a reference for your own schema implementations
-```
+**No dependencies**
 
 ## 🛠️ Utility Providers
 

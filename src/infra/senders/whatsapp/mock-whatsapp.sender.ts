@@ -45,6 +45,8 @@ import type {
   NotificationResult,
 } from "../../../core";
 
+import { isValidPhoneNumber, validateWhatsAppRecipient, WHATSAPP_ERRORS } from "./whatsapp.utils";
+
 /**
  * Configuration for Mock WhatsApp sender
  */
@@ -89,16 +91,16 @@ export class MockWhatsAppSender implements INotificationSender {
       return {
         success: false,
         notificationId: _recipient.id,
-        error: "Recipient phone number is required for WhatsApp",
+        error: WHATSAPP_ERRORS.PHONE_REQUIRED,
       };
     }
 
     // Validate phone format
-    if (!this.isValidPhoneNumber(_recipient.phone)) {
+    if (!isValidPhoneNumber(_recipient.phone)) {
       return {
         success: false,
         notificationId: _recipient.id,
-        error: `Invalid phone number format. Must be E.164 format (e.g., +1234567890). Got: ${_recipient.phone}`,
+        error: WHATSAPP_ERRORS.INVALID_PHONE_FORMAT(_recipient.phone),
       };
     }
 
@@ -162,22 +164,6 @@ export class MockWhatsAppSender implements INotificationSender {
    * @returns boolean - true if phone exists and is valid
    */
   validateRecipient(_recipient: NotificationRecipient): boolean {
-    return !!_recipient.phone && this.isValidPhoneNumber(_recipient.phone);
-  }
-
-  /**
-   * Validate phone number is in E.164 format
-   *
-   * E.164 format: +[country code][number]
-   * Examples: +14155551234, +447911123456, +212612345678
-   *
-   * @param phone - Phone number to validate
-   * @returns boolean - true if valid E.164 format
-   * @private
-   */
-  private isValidPhoneNumber(phone: string): boolean {
-    // E.164 format: + followed by 1-15 digits
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone);
+    return validateWhatsAppRecipient(_recipient);
   }
 }

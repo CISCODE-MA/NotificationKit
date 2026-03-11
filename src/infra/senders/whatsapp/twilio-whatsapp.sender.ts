@@ -64,6 +64,8 @@ import type {
   NotificationResult,
 } from "../../../core";
 
+import { isValidPhoneNumber, validateWhatsAppRecipient, WHATSAPP_ERRORS } from "./whatsapp.utils";
+
 /**
  * Configuration for Twilio WhatsApp sender
  *
@@ -163,16 +165,16 @@ export class TwilioWhatsAppSender implements INotificationSender {
         return {
           success: false,
           notificationId: _recipient.id,
-          error: "Recipient phone number is required for WhatsApp",
+          error: WHATSAPP_ERRORS.PHONE_REQUIRED,
         };
       }
 
       // Validate phone number format (E.164)
-      if (!this.isValidPhoneNumber(_recipient.phone)) {
+      if (!isValidPhoneNumber(_recipient.phone)) {
         return {
           success: false,
           notificationId: _recipient.id,
-          error: `Invalid phone number format. Must be E.164 format (e.g., +1234567890). Got: ${_recipient.phone}`,
+          error: WHATSAPP_ERRORS.INVALID_PHONE_FORMAT(_recipient.phone),
         };
       }
 
@@ -289,35 +291,6 @@ export class TwilioWhatsAppSender implements INotificationSender {
    * Called by NotificationService before attempting to send.
    */
   validateRecipient(_recipient: NotificationRecipient): boolean {
-    return !!_recipient.phone && this.isValidPhoneNumber(_recipient.phone);
-  }
-
-  /**
-   * Validate phone number is in E.164 format
-   *
-   * E.164 format: +[country code][number]
-   * - Starts with +
-   * - Followed by 1-3 digit country code
-   * - Followed by up to 15 total digits
-   *
-   * Valid examples:
-   * - +14155551234 (USA)
-   * - +447911123456 (UK)
-   * - +212612345678 (Morocco)
-   * - +33612345678 (France)
-   *
-   * Invalid examples:
-   * - 4155551234 (missing +)
-   * - +1-415-555-1234 (contains dashes)
-   * - +1 (415) 555-1234 (contains spaces and parentheses)
-   *
-   * @param phone - Phone number to validate
-   * @returns boolean - true if valid E.164 format
-   * @private
-   */
-  private isValidPhoneNumber(phone: string): boolean {
-    // E.164 format regex: + followed by 1-15 digits, no spaces or special chars
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone);
+    return validateWhatsAppRecipient(_recipient);
   }
 }
