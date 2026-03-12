@@ -22,21 +22,22 @@ jobs:
 
       - name: Validate version tag and package.json
         run: |
-          # Try to find a version tag on HEAD or recent commits
-          TAG=$(git describe --exact-match --tags HEAD 2>/dev/null || git tag --list --sort=-version:refname --merged HEAD 'v*.*.*' | head -1 || echo "")
+          # Since develop→master may be a squash merge, look for the latest version tag anywhere in the repo
+          # This handles both regular merges and squash merges
+          TAG=$(git tag --list --sort=-version:refname 'v*.*.*' | head -1 || echo "")
 
           if [[ -z "$TAG" ]]; then
             echo "❌ ERROR: No version tag found!"
             echo ""
             echo "This typically happens when:"
             echo "  1. You forgot to run 'npm version patch|minor|major' on develop"
-            echo "  2. You didn't push tags when merging develop→master"
-            echo "  3. PR merge didn't include the tag from develop"
+            echo "  2. You didn't push tags: git push origin develop --tags"
+            echo "  3. Tags weren't pushed to GitHub before merge"
             echo ""
             echo "📋 Correct workflow:"
             echo "  1. On develop: npm version patch (or minor/major)"
             echo "  2. On develop: git push origin develop --tags"
-            echo "  3. Create PR develop→master and merge"
+            echo "  3. Create PR develop→master and merge (can be squash merge)"
             echo "  4. Workflow automatically triggers on master with the tag"
             echo ""
             exit 1
