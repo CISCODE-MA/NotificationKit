@@ -3,7 +3,7 @@
  *
  * This layer contains concrete implementations of the core interfaces.
  * It includes:
- * - Notification senders (email, SMS, push)
+ * - Notification senders (email, SMS, push, WhatsApp)
  * - Repositories (MongoDB, in-memory)
  * - Utility providers (ID generator, datetime, templates, events)
  *

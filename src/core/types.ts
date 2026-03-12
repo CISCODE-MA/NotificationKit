@@ -1,35 +1,57 @@
 /**
+ * @file Core Domain Types and Interfaces
+ *
+ * This file defines all the core domain types, enums, and interfaces for the NotificationKit system.
+ * It contains the fundamental building blocks that represent notifications in the system:
+ *
+ * - NotificationChannel: Enum defining available delivery channels (Email, SMS, Push, etc.)
+ * - NotificationStatus: Enum tracking the lifecycle state of a notification
+ * - NotificationPriority: Enum for categorizing notification urgency
+ * - NotificationRecipient: Interface describing who receives the notification
+ * - NotificationContent: Interface describing what the notification contains
+ * - Notification: Main domain entity representing a complete notification
+ * - NotificationResult: Interface for send operation results
+ *
+ * These types are used throughout the entire system and form the core vocabulary
+ * of the notification domain.
+ */
+
+/**
  * Notification channel types
+ * Defines the different delivery mechanisms available for sending notifications
  */
 export enum NotificationChannel {
-  EMAIL = "email",
-  SMS = "sms",
-  PUSH = "push",
-  IN_APP = "in_app",
-  WEBHOOK = "webhook",
+  EMAIL = "email", // Email delivery via SMTP or email service providers
+  SMS = "sms", // SMS text messages via telecom providers
+  PUSH = "push", // Mobile push notifications via FCM, APNs, etc.
+  IN_APP = "in_app", // In-application notifications (stored for retrieval)
+  WEBHOOK = "webhook", // HTTP webhook callbacks to external systems
+  WHATSAPP = "whatsapp", // WhatsApp messages via Twilio or Meta Business API
 }
 
 /**
  * Notification status lifecycle
+ * Tracks the current state of a notification through its delivery process
  */
 export enum NotificationStatus {
-  PENDING = "pending",
-  QUEUED = "queued",
-  SENDING = "sending",
-  SENT = "sent",
-  DELIVERED = "delivered",
-  FAILED = "failed",
-  CANCELLED = "cancelled",
+  PENDING = "pending", // Created but not yet ready to send (e.g., scheduled for future)
+  QUEUED = "queued", // Ready to be sent, waiting in queue
+  SENDING = "sending", // Currently being sent to provider
+  SENT = "sent", // Successfully sent to provider (but not yet confirmed delivered)
+  DELIVERED = "delivered", // Confirmed delivered to recipient
+  FAILED = "failed", // Send attempt failed (may retry based on configuration)
+  CANCELLED = "cancelled", // Manually cancelled before sending
 }
 
 /**
  * Notification priority levels
+ * Used for queue ordering and handling urgency
  */
 export enum NotificationPriority {
-  LOW = "low",
-  NORMAL = "normal",
-  HIGH = "high",
-  URGENT = "urgent",
+  LOW = "low", // Low priority, can be delayed (e.g., newsletters, digests)
+  NORMAL = "normal", // Standard priority for most notifications
+  HIGH = "high", // Important, should be sent soon (e.g., alerts)
+  URGENT = "urgent", // Critical, send immediately (e.g., OTP codes, security alerts)
 }
 
 /**

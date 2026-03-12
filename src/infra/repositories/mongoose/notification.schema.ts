@@ -10,7 +10,7 @@ import type {
 // Helper to get Schema type at runtime (for Mongoose schema definitions)
 const getSchemaTypes = () => {
   try {
-    // @ts-expect-error - mongoose is an optional peer dependency
+    // @ts-ignore - mongoose is an optional peer dependency
     const mongoose = require("mongoose");
     return mongoose.Schema.Types;
   } catch {
