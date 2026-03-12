@@ -1,6 +1,6 @@
 {
   "name": "@ciscode/notification-kit",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A notification library for NestJS applications.",
   "author": "CisCode",
   "publishConfig": {
